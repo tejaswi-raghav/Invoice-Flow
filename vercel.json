@@ -1,9 +1,6 @@
 {
-  "version": 2,
-  "rewrites": [
-    {
-      "source": "/api/chat",
-      "destination": "/api/chat.py"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/chat.py": { "maxDuration": 30 }
+  }
 }
