@@ -129,6 +129,23 @@
   .terms{display:flex;flex-wrap:wrap;gap:6px}
   .term{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:7px;padding:4px 9px 4px 4px;font-size:12px;background:#fbfcfe;color:var(--ink-2)}
   .term .tc{font-family:var(--mono);font-size:9.5px;color:#fff;background:#94a3b8;padding:2px 5px;border-radius:4px}
+  /* details — unified clean layout */
+  .dx-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .dx-id{font-family:var(--mono);font-size:20px;font-weight:600;letter-spacing:-.2px;color:var(--ink)}
+  .dx-id .sub{display:block;font-family:var(--sans);font-size:10.5px;color:var(--muted);font-weight:500;margin-top:4px;letter-spacing:.3px}
+  .dx-type{font-size:12px;font-weight:600;color:var(--ai);background:var(--ai-soft);border:1px solid var(--ai-line);padding:5px 11px;border-radius:8px;white-space:nowrap}
+  .kvgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 24px}
+  .kvgrid .kv{display:flex;flex-direction:column;gap:4px;padding:11px 0;border-top:1px solid var(--line-soft)}
+  .kv .kk{font-size:10.5px;color:var(--muted);letter-spacing:.3px;display:flex;align-items:center;gap:6px}
+  .kv .kvv{font-size:14px;font-weight:550;color:var(--ink-2)}
+  .kv .kvv.mono{font-family:var(--mono);font-size:13px}
+  .prow{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-top:1px solid var(--line-soft);font-size:13px}
+  .prow:first-of-type{border-top:none;padding-top:2px}
+  .prow .pk{color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:6px}
+  .prow .pv{font-weight:550;color:var(--ink-2);text-align:right;word-break:break-word}
+  .prow .pv.mono{font-family:var(--mono);font-size:12.5px} .prow .pv.miss{color:var(--fail)}
+  .subcap{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 9px}
+  .bt-tbl td:first-child{width:1%;white-space:nowrap;color:var(--ai);font-weight:600}
 
   /* ---------- validation ---------- */
   .verdict{display:flex;align-items:center;gap:14px;padding:15px 17px;border-radius:var(--r);border:1px solid var(--line);margin-bottom:14px;background:var(--panel);box-shadow:var(--sh)}
@@ -222,6 +239,41 @@
   .fnode.rule{color:var(--ai);border-color:transparent;background:var(--ai-soft);font-family:var(--mono)}
   .fnode.passnode{color:var(--pass);border-color:transparent;background:var(--pass-soft);font-family:var(--mono)}
   .farrow{color:var(--faint);display:inline-flex} .farrow svg{width:15px;height:15px}
+  /* ---- coverage + diff + toolbars ---- */
+  .cov{display:flex;align-items:center;gap:12px;font-size:11.5px;color:var(--muted);margin:0 0 16px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fbfcfe;flex-wrap:wrap}
+  .cov .covt{font-weight:700;color:var(--ink-2)}
+  .covbar{flex:1;min-width:120px;max-width:240px;height:7px;border-radius:5px;background:var(--line-soft);overflow:hidden}
+  .covbar span{display:block;height:100%;background:var(--ai)}
+  .cov .covn{font-family:var(--mono)}
+  .diff{margin-top:10px;display:none;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .diff.show{display:block}
+  .diff .dh{padding:5px 11px;background:#fbfcfe;color:var(--muted);font-size:10px;letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid var(--line);font-weight:700}
+  .diff .dl{padding:3px 11px;white-space:pre-wrap;word-break:break-all;font-family:var(--mono);font-size:11px;line-height:1.5}
+  .diff .dl.del{background:var(--fail-soft);color:#7f1d1d} .diff .dl.del::before{content:"− "}
+  .diff .dl.add{background:var(--pass-soft);color:#14532d} .diff .dl.add::before{content:"+ "}
+  .diff .dl.non{color:var(--faint)}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .toolbar .vh{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .toolbar .tb-actions{display:flex;gap:7px;flex-wrap:wrap}
+  .lab-summary .seg{flex-wrap:wrap}
+  .privacy{display:inline-flex;align-items:center;gap:6px}
+  .privacy svg{width:13px;height:13px}
+  /* ---- compare ---- */
+  .cmp-pick{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .cmp-sel{flex:1;min-width:200px}
+  .cmp-sel label{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;font-weight:700;display:block;margin-bottom:6px}
+  .cmp-sel.a label{color:var(--ai)} .cmp-sel.b label{color:#0891b2}
+  .cmp-sel select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:var(--panel);color:var(--ink)}
+  .cmp-sel select:focus{outline:none;border-color:var(--ai);box-shadow:0 0 0 3px rgba(124,108,255,.15)}
+  table.cmp{width:100%;border-collapse:collapse;font-size:13px}
+  table.cmp th{text-align:left;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:9px 12px;border-bottom:1px solid var(--line)}
+  table.cmp th.colA{color:var(--ai)} table.cmp th.colB{color:#0891b2}
+  table.cmp td{padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  table.cmp td.lbl{color:var(--muted);width:32%}
+  table.cmp td.val{font-weight:550;color:var(--ink-2)} table.cmp td.val .mono{font-family:var(--mono)}
+  table.cmp tr.diff td{background:var(--warn-soft)} table.cmp tr.diff td.lbl{font-weight:600;color:var(--ink)}
+  .delta{font-family:var(--mono);font-size:11px;margin-left:6px;color:var(--warn)}
+  .cmp-tag{font-family:var(--mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:9px;background:var(--warn);color:#fff;font-weight:600;margin-left:7px;vertical-align:middle}
 
   /* ---------- invoice view (printable, light paper) ---------- */
   .view-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
@@ -329,6 +381,7 @@
       <div><h1>InvoiceFlow</h1><div class="sub">PINT-AE invoice workspace</div></div>
     </div>
     <div class="spacer"></div>
+    <div class="pill hide-sm privacy" title="Invoices are parsed, validated, and tested entirely in your browser. Only chat messages are sent to the assistant service."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private</div>
     <div class="pill hide-sm" id="globalStat">No invoices loaded</div>
     <button class="icon-btn" id="tglAgent" aria-label="Toggle assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z"/></svg></button>
   </div>
@@ -343,6 +396,7 @@
             <button class="ghost" id="browseBtn">Browse</button>
             <button class="ghost" id="sampleBtn">Load sample</button>
             <button class="ghost" id="sampleBadBtn">Non-compliant sample</button>
+            <button class="ghost" id="clearBtn">Clear workspace</button>
           </div>
         </div>
         <input type="file" id="fileInput" accept=".xml,text/xml,application/xml" multiple hidden />
@@ -356,6 +410,7 @@
         <button class="tab" data-tab="details">Details</button>
         <button class="tab" data-tab="validation">Validation <span class="count" id="cntVal">0</span></button>
         <button class="tab" data-tab="lab">Test Lab <span class="count" id="cntLab">0</span></button>
+        <button class="tab" data-tab="compare">Compare</button>
       </div>
       <div class="col-body" id="canvasBody"></div>
     </main>
@@ -560,11 +615,12 @@ function render(){
   $("cntLab").textContent=a&&a.analysis.ok?(a.scenarios||[]).length:0;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===state.tab));
   const body=$("canvasBody");
+  if(state.tab==="compare"){body.innerHTML=renderCompare();wireCompare();return;}
   if(!a){body.innerHTML="";body.appendChild(emptyNode());return;}
   if(!a.analysis.ok){body.innerHTML=`<div class="card"><h4>Cannot read file</h4><div class="finding fatal"><div class="msg">${esc(a.analysis.error)}</div><div class="ex">InvoiceFlow expects a UBL Invoice or CreditNote in PINT-AE form.</div></div></div>`;return;}
   if(state.tab==="view"){body.innerHTML=renderInvoiceView(a.analysis);const pb=$("printBtn");if(pb)pb.onclick=()=>window.print();}
-  else if(state.tab==="details")body.innerHTML=renderDetails(a.analysis);
-  else if(state.tab==="validation")body.innerHTML=renderValidation(a.analysis,a.findings);
+  else if(state.tab==="details"){body.innerHTML=renderDetails(a.analysis);const j=$("expJson");if(j)j.onclick=()=>exportDecodedJSON(a.analysis);const c=$("expCsv");if(c)c.onclick=()=>exportLinesCSV(a.analysis);}
+  else if(state.tab==="validation"){body.innerHTML=renderValidation(a.analysis,a.findings);const j=$("vJson");if(j)j.onclick=()=>exportFindingsJSON(a);const c=$("vCsv");if(c)c.onclick=()=>exportFindingsCSV(a);const r=$("vReport");if(r)r.onclick=()=>exportReportHTML(a);}
   else{body.innerHTML=renderLab(a);wireLab(a);}
 }
 function emptyNode(){const d=document.createElement("div");d.className="empty";
@@ -594,13 +650,16 @@ function renderDetails(a){
   const f=v=>v&&v!=="—"?esc(v):'<span style="color:var(--fail)">—</span>';
   const cats=a.taxCategories.map(c=>`<tr><td><span class="catcode ${esc(c.id)}">${esc(c.id)}</span> <span style="color:var(--muted)">${esc((KB.taxCategories[c.id]||{}).name||"")}</span></td><td class="num">${c.percent!==""?esc(c.percent)+"%":"—"}</td><td class="num">${fmt(c.taxable)}</td><td class="num">${fmt(c.tax)}</td></tr>`).join("");
   const lines=a.lines.slice(0,40).map(l=>`<tr><td class="mono">${esc(l.id||"")}</td><td>${esc(l.name||"")}</td><td class="num">${esc(l.qty||"")}</td><td><span class="catcode ${esc(l.vatCat)}">${esc(l.vatCat||"")}</span>${l.vatPct?" "+esc(l.vatPct)+"%":""}</td><td class="num">${fmt(l.amount)}</td></tr>`).join("");
-  const terms=a.terms.map(([code,val])=>`<span class="term"><span class="tc">${esc(code)}</span>${esc(String(val).slice(0,28))}</span>`).join("");
-  return `<div class="card"><h4>Document</h4><div class="doc-id">${f(a.id)}</div><div class="doc-row"><div class="field"><span class="lbl">Type <span class="bt">BT-3</span></span><span class="val">${esc(a.typeName)} ${a.typeCode?`<span class="mono" style="color:var(--muted)">(${esc(a.typeCode)})</span>`:""}</span></div><div class="field"><span class="lbl">Issued <span class="bt">BT-2</span></span><span class="val">${f(a.issueDate)}</span></div>${a.dueDate?`<div class="field"><span class="lbl">Due <span class="bt">BT-9</span></span><span class="val">${esc(a.dueDate)}</span></div>`:""}<div class="field"><span class="lbl">Currency <span class="bt">BT-5</span></span><span class="val">${f(a.currency)}</span></div></div></div>
-  <div class="card"><h4>Parties</h4><div class="parties"><div class="party"><div class="role">Seller</div><div class="pn">${f(a.seller.name)}</div><div class="trn ${a.seller.trn?"":"missing"}">TRN ${a.seller.trn?esc(a.seller.trn):"missing"}</div></div><div class="party"><div class="role">Buyer</div><div class="pn">${f(a.buyer.name)}</div><div class="trn ${a.buyer.trn?"":"missing"}">TRN ${a.buyer.trn?esc(a.buyer.trn):"missing"}</div></div></div></div>
-  ${a.taxCategories.length?`<div class="card"><h4>VAT breakdown</h4><table class="grid"><thead><tr><th>Category <span class="bt">BT-118</span></th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">VAT</th></tr></thead><tbody>${cats}</tbody></table></div>`:""}
-  <div class="card"><h4>Totals</h4><div class="totals"><div class="tot"><div class="k">Lines <span class="bt">BT-106</span></div><div class="v">${fmt(a.totals.lineExt)}</div></div><div class="tot"><div class="k">Net <span class="bt">BT-109</span></div><div class="v">${fmt(a.totals.taxExcl)}</div></div><div class="tot"><div class="k">VAT <span class="bt">BT-110</span></div><div class="v">${fmt(a.taxTotal)}</div></div><div class="tot payable"><div class="k">Payable <span class="bt">BT-115</span></div><div class="v">${esc(a.currency||"")} ${fmt(a.totals.payable)}</div></div></div></div>
-  ${a.lines.length?`<div class="card"><h4>Lines (${a.lines.length})</h4><table class="grid"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th>VAT</th><th class="num">Amount</th></tr></thead><tbody>${lines}</tbody></table></div>`:""}
-  <div class="card"><h4>Business terms detected</h4><div class="terms">${terms}</div></div>`;
+  const party=(role,nameBT,trnBT,p)=>`<div class="party"><div class="role">${role}</div><div class="prow"><span class="pk">Name <span class="bt">${nameBT}</span></span><span class="pv">${p.name?esc(p.name):'<span class="miss">—</span>'}</span></div><div class="prow"><span class="pk">TRN <span class="bt">${trnBT}</span></span><span class="pv mono ${p.trn?"":"miss"}">${p.trn?esc(p.trn):"missing"}</span></div>${p.country?`<div class="prow"><span class="pk">Country</span><span class="pv">${esc(p.country)}</span></div>`:""}${p.addr?`<div class="prow"><span class="pk">Address</span><span class="pv">${esc(p.addr)}</span></div>`:""}</div>`;
+  const termRows=a.terms.map(([code,val])=>`<tr><td class="mono">${esc(code)}</td><td style="color:var(--muted)">${esc(TERM_LABELS[code]||"")}</td><td>${esc(String(val))}</td></tr>`).join("");
+  const dl=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  return `<div class="toolbar"><span class="vh">Decoded data</span><div class="tb-actions"><button class="btn" id="expJson">${dl} Export JSON</button><button class="btn" id="expCsv">${dl} Lines CSV</button></div></div>
+  <div class="card"><div class="dx-head"><div class="dx-id">${f(a.id)}<span class="sub">Invoice number · BT-1</span></div><span class="dx-type">${esc(a.typeName)}${a.typeCode?" · "+esc(a.typeCode):""}</span></div>
+    <div class="kvgrid"><div class="kv"><span class="kk">Issue date <span class="bt">BT-2</span></span><span class="kvv mono">${f(a.issueDate)}</span></div>${a.dueDate?`<div class="kv"><span class="kk">Due date <span class="bt">BT-9</span></span><span class="kvv mono">${esc(a.dueDate)}</span></div>`:""}<div class="kv"><span class="kk">Currency <span class="bt">BT-5</span></span><span class="kvv mono">${f(a.currency)}</span></div><div class="kv"><span class="kk">Line items</span><span class="kvv">${a.lines.length}</span></div></div></div>
+  <div class="card"><h4>Parties</h4><div class="parties">${party("Seller","BT-27","BT-31",a.seller)}${party("Buyer","BT-44","BT-48",a.buyer)}</div></div>
+  <div class="card"><h4>Tax &amp; totals</h4><div class="totals"><div class="tot"><div class="k">Lines <span class="bt">BT-106</span></div><div class="v">${fmt(a.totals.lineExt)}</div></div><div class="tot"><div class="k">Net <span class="bt">BT-109</span></div><div class="v">${fmt(a.totals.taxExcl)}</div></div><div class="tot"><div class="k">VAT <span class="bt">BT-110</span></div><div class="v">${fmt(a.taxTotal)}</div></div><div class="tot payable"><div class="k">Payable <span class="bt">BT-115</span></div><div class="v">${esc(a.currency||"")} ${fmt(a.totals.payable)}</div></div></div>${a.taxCategories.length?`<div class="subcap">VAT breakdown by category</div><table class="grid"><thead><tr><th>Category <span class="bt">BT-118</span></th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">VAT</th></tr></thead><tbody>${cats}</tbody></table>`:""}</div>
+  ${a.lines.length?`<div class="card"><h4>Line items (${a.lines.length})</h4><table class="grid"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th>VAT</th><th class="num">Amount</th></tr></thead><tbody>${lines}</tbody></table>${a.lines.length>40?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Showing first 40 of ${a.lines.length} lines.</div>`:""}</div>`:""}
+  <div class="card"><h4>Business terms detected</h4><table class="grid bt-tbl"><thead><tr><th>Code</th><th>Term</th><th>Value</th></tr></thead><tbody>${termRows}</tbody></table></div>`;
 }
 
 const ICONS={
@@ -624,7 +683,10 @@ const ICONS={
   Currency:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   Totals:'<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/>',
   Structure:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
-  Baseline:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
+  Baseline:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  diff:'<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 6h6a3 3 0 0 1 3 3v6M15 18H9a3 3 0 0 1-3-3V9"/>',
+  lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
 };
 function ic(n){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.dot}</svg>`;}
 function donut(pass,total){const r=30,c=2*Math.PI*r,frac=total?pass/total:0;const col=!total||pass===total?"var(--pass)":(pass===0?"var(--faint)":"var(--warn)");
@@ -644,21 +706,56 @@ function renderValidation(a,findings){
   const items=findings.filter(f=>f.sev!=="info"||(!fatal&&!warn)).map(f=>{
     const isOk=f.id==="AE-OK-00";const sevCls=isOk?"pass":f.sev;const sevIc=isOk?"check":(f.sev==="fatal"?"x":f.sev==="warning"?"alert":"info");
     return `<div class="finding ${f.sev}"><div class="sev-ic ${sevCls}">${ic(sevIc)}</div><div class="fbody"><div class="fh"><span class="sev ${f.sev}">${esc(f.sev)}</span><span class="rid">${esc(f.id)}</span>${f.term&&f.term!=="—"?`<span class="bt">${esc(f.term)}</span>`:""}</div><div class="msg">${esc(f.msg)}</div><div class="ex">${f.ex}</div>${f.fix?`<div class="fix"><b>Fix:</b> ${f.fix}</div>`:""}</div></div>`;}).join("");
-  return hero+items+`<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
+  const toolbar=`<div class="toolbar"><span class="vh">Validation result</span><div class="tb-actions"><button class="btn" id="vReport">${ic("file")} Download report</button><button class="btn" id="vJson">${ic("download")} JSON</button><button class="btn" id="vCsv">${ic("download")} CSV</button></div></div>`;
+  return toolbar+hero+items+`<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
 }
 
 function renderLab(src){
   const s=src.scenarios||[];const cats=[...new Set(s.map(x=>x.category))];const neg=s.filter(x=>x.kind==="negative").length;
-  let html=`<div class="lab-head"><div class="li">Each scenario takes <b>${esc(src.name)}</b> and injects one fault, then checks that the validator catches it. Run one, run them all, or download the broken XML.</div><button class="btn ai" id="runAllBtn">${ic("play")} Run all checks</button></div>`;
+  const cov=coverage(src);const multi=state.sources.filter(x=>x.analysis.ok).length>1;
+  let html=`<div class="lab-head"><div class="li">Each scenario takes <b>${esc(src.name)}</b> and injects one fault, then checks that the validator catches it. Run one, run them all, or download the broken XML.</div><div class="tb-actions"><button class="btn ai" id="runAllBtn">${ic("play")} Run all checks</button>${multi?`<button class="btn" id="runBatchBtn">${ic("diff")} Run all invoices</button>`:""}</div></div>`;
   html+=`<div class="lab-summary" id="labSum">${donut(0,s.length)}<div><div class="lt">${s.length} scenarios ready</div><div class="ls">${neg} fault injections across ${cats.length} categories, plus 1 baseline control. Press “Run all checks” to grade them — each should fire its expected rule.</div></div></div>`;
+  html+=`<div class="cov"><span class="covt">Rule coverage</span><div class="covbar"><span style="width:${(cov.covered/cov.total*100).toFixed(0)}%"></span></div><span class="covn">${cov.covered}/${cov.total} built-in rules${cov.missing.length?" · gaps: "+cov.missing.join(", "):" · complete"}</span></div>`;
   cats.forEach(cat=>{html+=`<div class="cat-h"><span class="ci">${ic(cat)}</span>${esc(cat)}</div>`;
     s.forEach((sc,i)=>{if(sc.category!==cat)return;
       const flowMut=sc.kind==="positive"
         ?`<span class="fnode">${ic("equals")} unchanged</span><span class="farrow">${ic("arrow")}</span><span class="fnode passnode">${ic("check")} passes</span>`
         :`<span class="fnode mut ${sc.severity}">${ic("scissors")} ${esc(sc.severity)} fault</span><span class="farrow">${ic("arrow")}</span><span class="fnode rule">${ic("flag")} ${esc(sc.rule)}</span>`;
-      html+=`<div class="scn" data-i="${i}"><div class="sh"><span class="status idle" data-status>${ic("dot")}</span><span class="kind ${sc.kind}">${sc.kind}</span><span class="st">${esc(sc.title)}</span></div><div class="se">${esc(sc.explain)}</div><div class="flow"><span class="fnode valid">${ic("file")} valid</span><span class="farrow">${ic("arrow")}</span>${flowMut}</div><div class="scn-actions"><button class="btn primary" data-act="run">${ic("play")} Run check</button><button class="btn" data-act="dl">${ic("download")} XML</button><button class="btn" data-act="add">${ic("plus")} Add as invoice</button></div><div class="runres" data-res></div></div>`;});});
+      html+=`<div class="scn" data-i="${i}"><div class="sh"><span class="status idle" data-status>${ic("dot")}</span><span class="kind ${sc.kind}">${sc.kind}</span><span class="st">${esc(sc.title)}</span></div><div class="se">${esc(sc.explain)}</div><div class="flow"><span class="fnode valid">${ic("file")} valid</span><span class="farrow">${ic("arrow")}</span>${flowMut}</div><div class="scn-actions"><button class="btn primary" data-act="run">${ic("play")} Run check</button><button class="btn" data-act="diff">${ic("diff")} View change</button><button class="btn" data-act="dl">${ic("download")} XML</button><button class="btn" data-act="add">${ic("plus")} Add as invoice</button></div><div class="runres" data-res></div><div class="diff" data-diff></div></div>`;});});
   return html;
 }
+function renderCompare(){
+  const oks=state.sources.filter(s=>s.analysis.ok);
+  if(oks.length<2)return `<div class="empty" style="height:auto;padding:54px 30px"><svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 6h6a3 3 0 0 1 3 3v6M15 18H9a3 3 0 0 1-3-3V9"/></svg><h3>Load two invoices to compare</h3><p>Add at least two readable PINT-AE invoices, then pick A and B to see a field-by-field diff of parties, totals, tax, and validation findings. Tip: the Test Lab’s “Add as invoice” is a quick way to get a second one.</p></div>`;
+  let A=active();if(!A||!A.analysis.ok)A=oks[0];
+  let B=state.sources.find(s=>s.id===state.compareB&&s.analysis.ok);
+  if(!B||B.id===A.id)B=oks.find(s=>s.id!==A.id);
+  state.compareB=B.id;
+  const xA=A.analysis,xB=B.analysis;
+  const opt=sel=>oks.map(s=>`<option value="${s.id}"${s.id===sel?" selected":""}>${esc(s.name)}</option>`).join("");
+  const rows=[];
+  const trow=(label,va,vb,mono)=>{va=(va==null||va==="")?"—":va;vb=(vb==null||vb==="")?"—":vb;const diff=String(va)!==String(vb);rows.push(`<tr class="${diff?"diff":""}"><td class="lbl">${esc(label)}${diff?'<span class="cmp-tag">changed</span>':""}</td><td class="val">${mono?'<span class="mono">'+esc(va)+"</span>":esc(va)}</td><td class="val">${mono?'<span class="mono">'+esc(vb)+"</span>":esc(vb)}</td></tr>`);};
+  const nrow=(label,na,nb)=>{const diff=(na||0)!==(nb||0);const delta=diff?` <span class="delta">${(nb-na)>=0?"+":""}${fmt(nb-na)}</span>`:"";rows.push(`<tr class="${diff?"diff":""}"><td class="lbl">${esc(label)}${diff?'<span class="cmp-tag">changed</span>':""}</td><td class="val"><span class="mono">${fmt(na)}</span></td><td class="val"><span class="mono">${fmt(nb)}</span>${delta}</td></tr>`);};
+  trow("Invoice number",xA.id,xB.id,true);trow("Type",xA.typeName,xB.typeName);
+  trow("Issue date",xA.issueDate,xB.issueDate,true);trow("Due date",xA.dueDate,xB.dueDate,true);
+  trow("Currency",xA.currency,xB.currency,true);
+  trow("Seller",xA.seller.name,xB.seller.name);trow("Seller TRN",xA.seller.trn,xB.seller.trn,true);
+  trow("Buyer",xA.buyer.name,xB.buyer.name);trow("Buyer TRN",xA.buyer.trn,xB.buyer.trn,true);
+  trow("Tax categories",[...new Set(xA.taxCategories.map(c=>c.id))].sort().join(", "),[...new Set(xB.taxCategories.map(c=>c.id))].sort().join(", "),true);
+  trow("Line items",String(xA.lines.length),String(xB.lines.length),true);
+  nrow("Sum of lines (BT-106)",xA.totals.lineExt,xB.totals.lineExt);nrow("Net (BT-109)",xA.totals.taxExcl,xB.totals.taxExcl);
+  nrow("Total VAT (BT-110)",xA.taxTotal,xB.taxTotal);nrow("Payable (BT-115)",xA.totals.payable,xB.totals.payable);
+  const fa=(A.findings||[]).filter(f=>f.sev!=="info"),fb=(B.findings||[]).filter(f=>f.sev!=="info");
+  const sa=new Set(fa.map(f=>f.id)),sb=new Set(fb.map(f=>f.id));
+  const onlyA=[...sa].filter(x=>!sb.has(x)),onlyB=[...sb].filter(x=>!sa.has(x)),both=[...sa].filter(x=>sb.has(x));
+  const fatalA=fa.filter(f=>f.sev==="fatal").length,fatalB=fb.filter(f=>f.sev==="fatal").length;
+  const diffs=rows.filter(r=>r.indexOf('class="diff"')>-1).length;
+  const findingCard=`<div class="card"><h4>Validation comparison</h4><div class="totals"><div class="tot"><div class="k">A · fatal</div><div class="v" style="color:${fatalA?"var(--fail)":"var(--pass)"}">${fatalA}</div></div><div class="tot"><div class="k">B · fatal</div><div class="v" style="color:${fatalB?"var(--fail)":"var(--pass)"}">${fatalB}</div></div><div class="tot"><div class="k">Shared issues</div><div class="v">${both.length}</div></div></div>${onlyA.length?`<div style="margin-top:13px;font-size:12.5px"><b style="color:var(--ai)">Only in A:</b> ${onlyA.map(r=>'<span class="rid">'+esc(r)+"</span>").join(", ")}</div>`:""}${onlyB.length?`<div style="margin-top:8px;font-size:12.5px"><b style="color:#0891b2">Only in B:</b> ${onlyB.map(r=>'<span class="rid">'+esc(r)+"</span>").join(", ")}</div>`:""}${!onlyA.length&&!onlyB.length?`<div style="margin-top:13px;font-size:12.5px;color:var(--muted)">Both invoices raise the same set of issues.</div>`:""}</div>`;
+  return `<div class="toolbar"><span class="vh">Compare invoices</span><span class="pill" style="background:var(--chip);border:1px solid var(--line);color:var(--muted)">${diffs} field${diffs===1?"":"s"} differ</span></div>
+   <div class="cmp-pick"><div class="cmp-sel a"><label>Invoice A</label><select id="cmpA">${opt(A.id)}</select></div><div class="cmp-sel b"><label>Invoice B</label><select id="cmpB">${opt(B.id)}</select></div></div>
+   <div class="card"><h4>Field by field</h4><table class="cmp"><thead><tr><th></th><th class="colA">A · ${esc(A.name)}</th><th class="colB">B · ${esc(B.name)}</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>${findingCard}`;
+}
+function wireCompare(){const a=$("cmpA"),b=$("cmpB");if(a)a.onchange=()=>{state.activeId=+a.value;render();persist();};if(b)b.onchange=()=>{state.compareB=+b.value;render();persist();};}
 function runScenario(sc){
   const xml=sc.mutate();const a=parsePintAe(xml);
   if(!a.ok)return{ok:false,text:"The mutated file no longer parses: "+a.error};
@@ -669,26 +766,79 @@ function runScenario(sc){
   return{ok:false,text:`Rule <b>${esc(sc.rule)}</b> did not fire. Fired: ${fnd.filter(f=>f.sev!=="info").map(f=>f.id).join(", ")||"none"}.`};
 }
 function wireLab(src){
-  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");
+  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const dpanel=node.querySelector("[data-diff]");
     node.querySelector('[data-act="run"]').onclick=()=>{const r=runScenario(sc);res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);};
+    node.querySelector('[data-act="diff"]').onclick=()=>{
+      if(dpanel.classList.contains("show")){dpanel.classList.remove("show");return;}
+      const d=xmlDiff(src.raw,sc.mutate());
+      dpanel.innerHTML=`<div class="dh">What this scenario changes</div>`+
+        (d.removed.map(l=>`<div class="dl del">${esc(l.trim())}</div>`).join("")||"")+
+        (d.added.map(l=>`<div class="dl add">${esc(l.trim())}</div>`).join("")||"")+
+        (!d.removed.length&&!d.added.length?`<div class="dl non">No line-level change detected (the mutation alters an attribute in place).</div>`:"");
+      dpanel.classList.add("show");};
     node.querySelector('[data-act="dl"]').onclick=()=>download(sc.mutate(),src.name.replace(/\.xml$/i,"")+"__"+sc.rule+".xml");
     node.querySelector('[data-act="add"]').onclick=()=>addSource(src.name.replace(/\.xml$/i,"")+" ["+sc.rule+"].xml",sc.mutate());});
   const rab=$("runAllBtn");if(rab)rab.onclick=()=>runAll(src);
+  const bb=$("runBatchBtn");if(bb)bb.onclick=()=>runBatch();
 }
 function runAll(src){
-  let pass=0;const total=(src.scenarios||[]).length;
-  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const r=runScenario(sc);if(r.ok)pass++;res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);});
-  const sum=$("labSum");if(sum){const ok=pass===total;
-    sum.innerHTML=donut(pass,total)+`<div><div class="lt">${ok?"All scenarios behaved as expected":pass+" of "+total+" behaved as expected"}</div><div class="ls">${ok?"Every fault injection fired its expected rule, and the baseline control passed.":"Most fired correctly. Divergences usually mean the source invoice is already non-compliant — open each card to see what fired."}</div><div class="seg"><span style="color:var(--pass)">${ic("check")} <b>${pass}</b> as expected</span><span style="color:var(--warn)">${ic("alert")} <b>${total-pass}</b> diverged</span></div></div>`;}
+  const rows=[];let pass=0;
+  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const r=runScenario(sc);if(r.ok)pass++;res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);rows.push({invoice:src.name,category:sc.category,title:sc.title,rule:sc.rule,kind:sc.kind,ok:r.ok,detail:r.text.replace(/<[^>]+>/g,"")});});
+  const total=rows.length;state.lastRun={mode:"single",invoice:src.name,rows};
+  showRunSummary(pass,total,pass===total?"All scenarios behaved as expected":pass+" of "+total+" behaved as expected",pass===total?"Every fault injection fired its expected rule, and the baseline control passed.":"Divergences usually mean the source invoice is already non-compliant — open each card to see what fired.");
   return{pass,total};
 }
 
-function download(text,name){const b=new Blob([text],{type:"application/xml"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+function dl(text,name,mime){const b=new Blob([text],{type:mime||"text/plain"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+function download(text,name){dl(text,name,"application/xml");}
+function csvCell(v){v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function toCSV(rows){return rows.map(r=>r.map(csvCell).join(",")).join("\n");}
+function decodedObject(a){return{id:a.id,type:a.typeName,typeCode:a.typeCode,issueDate:a.issueDate,dueDate:a.dueDate,currency:a.currency,seller:a.seller,buyer:a.buyer,taxCategories:a.taxCategories,totals:a.totals,vat:a.taxTotal,lines:a.lines};}
+function exportDecodedJSON(a){dl(JSON.stringify(decodedObject(a),null,2),(a.id||"invoice")+"-decoded.json","application/json");}
+function exportLinesCSV(a){const rows=[["line","item","qty","unit","unitPrice","vatCategory","vatRate","amount"]];a.lines.forEach(l=>rows.push([l.id,l.name,l.qty,l.unit,l.price,l.vatCat,l.vatPct,l.amount]));dl(toCSV(rows),(a.id||"invoice")+"-lines.csv","text/csv");}
+function exportFindingsJSON(src){const a=src.analysis;dl(JSON.stringify({invoice:a.id,type:a.typeName,findings:(src.findings||[]).map(f=>({rule:f.id,severity:f.sev,term:f.term,message:f.msg,fix:(f.fix||"").replace(/<[^>]+>/g,"")}))},null,2),(a.id||"invoice")+"-findings.json","application/json");}
+function exportFindingsCSV(src){const rows=[["rule","severity","term","message","fix"]];(src.findings||[]).forEach(f=>rows.push([f.id,f.sev,f.term,f.msg,(f.fix||"").replace(/<[^>]+>/g,"")]));dl(toCSV(rows),(src.analysis.id||"invoice")+"-findings.csv","text/csv");}
+function exportReportHTML(src){
+  const a=src.analysis;const fnd=src.findings||[];const fatal=fnd.filter(f=>f.sev==="fatal").length,warn=fnd.filter(f=>f.sev==="warning").length;
+  const verdict=fatal?"Would be rejected":warn?"Valid, with warnings":"Passes built-in checks";const col=fatal?"#dc2626":warn?"#d97706":"#16a34a";
+  const rows=fnd.filter(f=>f.sev!=="info"||(!fatal&&!warn)).map(f=>`<tr><td style="color:${f.sev==="fatal"?"#dc2626":f.sev==="warning"?"#d97706":"#16a34a"};font-weight:600;text-transform:uppercase;font-size:11px">${esc(f.sev)}</td><td style="font-family:monospace">${esc(f.id)}</td><td>${esc(f.term||"")}</td><td>${esc(f.msg)}</td><td>${(f.fix||"").replace(/<[^>]+>/g,"")}</td></tr>`).join("");
+  const html=`<!doctype html><meta charset="utf-8"><title>Validation report — ${esc(a.id||"invoice")}</title><body style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:900px;margin:40px auto;color:#0f172a;padding:0 20px"><h1 style="font-size:20px;margin:0">InvoiceFlow validation report</h1><p style="color:#64748b;margin:6px 0 20px">${esc(a.typeName)} · ${esc(a.id||"—")} · generated ${new Date().toISOString().slice(0,10)}</p><div style="padding:14px 18px;border-radius:10px;background:${col}14;border:1px solid ${col}55;margin-bottom:20px"><b style="color:${col};font-size:16px">${verdict}</b> &nbsp;·&nbsp; ${fatal} fatal, ${warn} warning</div><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;border-bottom:2px solid #e4e8f0"><th style="padding:8px">Severity</th><th style="padding:8px">Rule</th><th style="padding:8px">Term</th><th style="padding:8px">Issue</th><th style="padding:8px">Fix</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:8px;color:#16a34a">No issues detected.</td></tr>'}</tbody></table><p style="margin-top:24px;color:#94a3b8;font-size:11px">Heuristic checks that mirror PINT-AE schematron rules; not the certified validator. Confirm against the accredited schematron before go-live.</p></body>`;
+  dl(html,(a.id||"invoice")+"-validation-report.html","text/html");
+}
+function xmlDiff(orig,mut){const A=orig.split(/\n/),B=mut.split(/\n/);const sa=new Set(A.map(s=>s.trim())),sb=new Set(B.map(s=>s.trim()));
+  const removed=A.filter(l=>l.trim()&&!sb.has(l.trim())).slice(0,8);const added=B.filter(l=>l.trim()&&!sa.has(l.trim())).slice(0,8);return{removed,added};}
+function coverage(src){const keys=Object.keys(RULE_KB);const covered=new Set((src.scenarios||[]).map(s=>s.rule).filter(r=>keys.includes(r)));return{covered:covered.size,total:keys.length,missing:keys.filter(r=>!covered.has(r))};}
+function showRunSummary(pass,total,lead,sub){const sum=$("labSum");if(!sum)return;
+  sum.innerHTML=donut(pass,total)+`<div style="flex:1;min-width:0"><div class="lt">${lead}</div><div class="ls">${sub}</div><div class="seg"><span style="color:var(--pass)">${ic("check")} <b>${pass}</b> as expected</span><span style="color:var(--warn)">${ic("alert")} <b>${total-pass}</b> diverged</span><span style="margin-left:auto;display:flex;gap:7px"><button class="btn" id="expRunJson">${ic("download")} JSON</button><button class="btn" id="expRunJunit">${ic("download")} JUnit</button></span></div></div>`;
+  const j=$("expRunJson");if(j)j.onclick=exportRunJSON;const u=$("expRunJunit");if(u)u.onclick=exportRunJunit;}
+function exportRunJSON(){if(state.lastRun)dl(JSON.stringify(state.lastRun,null,2),"invoiceflow-test-results.json","application/json");}
+function exportRunJunit(){if(!state.lastRun)return;const rows=state.lastRun.rows,fails=rows.filter(r=>!r.ok).length;
+  let x=`<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="InvoiceFlow PINT-AE" tests="${rows.length}" failures="${fails}">\n`;
+  rows.forEach(r=>{x+=`  <testcase classname="${esc(r.invoice)} · ${esc(r.category)}" name="${esc(r.title)} [${esc(r.rule)}]">`;if(!r.ok)x+=`\n    <failure message="${esc(r.rule)} did not behave as expected">${esc(r.detail)}</failure>\n  `;x+="</testcase>\n";});
+  x+="</testsuite>\n";dl(x,"invoiceflow-junit.xml","application/xml");}
+function runBatch(){const rows=[];state.sources.forEach(src=>{if(!src.analysis.ok)return;(src.scenarios||[]).forEach(sc=>{const r=runScenario(sc);rows.push({invoice:src.name,category:sc.category,title:sc.title,rule:sc.rule,kind:sc.kind,ok:r.ok,detail:r.text.replace(/<[^>]+>/g,"")});});});
+  const pass=rows.filter(r=>r.ok).length;state.lastRun={mode:"batch",rows};
+  const inv=new Set(rows.map(r=>r.invoice)).size;
+  showRunSummary(pass,rows.length,pass===rows.length?`All ${rows.length} checks passed across ${inv} invoices`:`${pass} of ${rows.length} checks passed across ${inv} invoices`,"Aggregated regression run over every loaded invoice. Export as JSON or JUnit for CI.");}
 
 /* ---- source management ---- */
 function addSource(name,raw){const analysis=parsePintAe(raw);const findings=analysis.ok?validate(analysis):[];const scenarios=analysis.ok?generateScenarios(analysis):[];
-  const s={id:idSeq++,name,raw,analysis,findings,scenarios};state.sources.push(s);state.activeId=s.id;state.tab="view";render();return s;}
-function removeSource(id){state.sources=state.sources.filter(s=>s.id!==id);if(state.activeId===id)state.activeId=state.sources.length?state.sources[0].id:null;render();}
+  const s={id:idSeq++,name,raw:analysis.raw||raw,analysis,findings,scenarios};state.sources.push(s);state.activeId=s.id;state.tab="view";render();persist();return s;}
+function removeSource(id){state.sources=state.sources.filter(s=>s.id!==id);if(state.activeId===id)state.activeId=state.sources.length?state.sources[0].id:null;render();persist();}
+
+/* ---- persistence (works on your deployed site; degrades silently if storage is blocked) ---- */
+const STORE_KEY="invoiceflow.v1";
+function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify({sources:state.sources.map(s=>({name:s.name,raw:s.raw})),activeIndex:state.sources.findIndex(s=>s.id===state.activeId),tab:state.tab,history:state.history.slice(-40)}));}catch(e){}}
+function restore(){let d;try{d=JSON.parse(localStorage.getItem(STORE_KEY)||"null");}catch(e){d=null;}
+  if(!d||!Array.isArray(d.sources)||!d.sources.length)return false;
+  d.sources.forEach(o=>{const analysis=parsePintAe(o.raw);const findings=analysis.ok?validate(analysis):[];const scenarios=analysis.ok?generateScenarios(analysis):[];state.sources.push({id:idSeq++,name:o.name,raw:o.raw,analysis,findings,scenarios});});
+  const ix=Math.max(0,Math.min(d.activeIndex|0,state.sources.length-1));
+  state.activeId=state.sources[ix].id;state.tab=d.tab||"view";state.history=Array.isArray(d.history)?d.history:[];
+  return true;}
+function clearWorkspace(){if(!confirm("Clear all loaded invoices and chat history from this browser?"))return;
+  state.sources=[];state.activeId=null;state.history=[];state.tab="view";state.lastRun=null;
+  try{localStorage.removeItem(STORE_KEY);}catch(e){}
+  $("chat").innerHTML="";welcome();render();}
 
 /* ---- file intake ---- */
 function readFiles(fl){[...fl].forEach(file=>{const r=new FileReader();r.onload=()=>addSource(file.name,r.result);r.readAsText(file);});}
@@ -696,11 +846,12 @@ $("fileInput").addEventListener("change",e=>{readFiles(e.target.files);e.target.
 $("browseBtn").onclick=()=>$("fileInput").click();$("addBtn").onclick=()=>$("fileInput").click();
 $("sampleBtn").onclick=()=>addSource("sample-tax-invoice.xml",SAMPLE_GOOD);
 $("sampleBadBtn").onclick=()=>addSource("non-compliant-invoice.xml",SAMPLE_BAD);
+$("clearBtn").onclick=()=>clearWorkspace();
 const dz=$("dropzone");
 ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
 dz.addEventListener("drop",e=>{if(e.dataTransfer.files.length)readFiles(e.dataTransfer.files);});
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{state.tab=t.dataset.tab;render();});
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{state.tab=t.dataset.tab;render();persist();});
 $("tglSources").onclick=()=>$("colSources").classList.toggle("hide");
 $("tglAgent").onclick=()=>$("colAgent").classList.toggle("hide");
 if(window.innerWidth<=1100){$("colSources").classList.add("hide");$("colAgent").classList.add("hide");}
@@ -750,7 +901,7 @@ async function submit(text){
   const actLabel=action?executeAction(action):null;
   botEl.querySelector(".bubble").innerHTML=mdToHtml(clean||"(no answer)")+(actLabel?`<div class="actpill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>${esc(actLabel)}</div>`:"");
   state.history.push({role:"assistant",content:clean||replyText});
-  state.busy=false;$("sendBtn").disabled=false;$("chat").scrollTop=$("chat").scrollHeight;
+  state.busy=false;$("sendBtn").disabled=false;$("chat").scrollTop=$("chat").scrollHeight;persist();
 }
 async function askBackend(){
   const msgs=state.history.filter(m=>m.role==="user"||m.role==="assistant").slice(-10);
@@ -813,9 +964,12 @@ $("sendBtn").onclick=()=>submit($("chatInput").value.trim());
 (async function probe(){try{const r=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:"healthcheck",messages:[{role:"user",content:"ping"}]})});setMode(r.ok);}catch(e){setMode(false);}})();
 
 /* ---- boot ---- */
+function welcome(){const chat=$("chat");const d=document.createElement("div");d.className="msg bot";
+  d.innerHTML=`<div class="bubble"><p>I'm the <b>InvoiceFlow agent</b>. Load an invoice and I can read it, explain it, validate it, generate and run test scenarios, and operate the tabs for you.</p><p>Try a suggestion below, or just tell me what you want to do.</p></div>`;chat.appendChild(d);}
+function replayChat(){const chat=$("chat");state.history.forEach(m=>{const d=document.createElement("div");if(m.role==="user"){d.className="msg user";d.textContent=m.content;}else{d.className="msg bot";d.innerHTML=`<div class="bubble">${mdToHtml(m.content)}</div>`;}chat.appendChild(d);});chat.scrollTop=chat.scrollHeight;}
 renderChips();
-(function welcome(){const chat=$("chat");const d=document.createElement("div");d.className="msg bot";
-  d.innerHTML=`<div class="bubble"><p>I'm the <b>InvoiceFlow agent</b>. Load an invoice and I can read it, explain it, validate it, generate and run test scenarios, and operate the tabs for you.</p><p>Try a suggestion below, or just tell me what you want to do.</p></div>`;chat.appendChild(d);})();
+const restored=restore();
+if(restored&&state.history.length)replayChat();else welcome();
 render();
 
 /* ---- embedded samples ---- */
