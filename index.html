@@ -182,6 +182,46 @@
   .runres{margin-top:10px;font-size:12px;padding:9px 11px;border-radius:6px;display:none}
   .runres.ok{display:block;background:var(--pass-soft);color:var(--pass)}
   .runres.miss{display:block;background:var(--warn-soft);color:var(--warn)}
+  /* ---- pictorial: validation ---- */
+  .v-hero{display:flex;align-items:center;gap:16px;padding:18px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);box-shadow:var(--sh);margin-bottom:14px}
+  .v-hero .ring{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+  .v-hero .ring svg{width:28px;height:28px}
+  .v-hero.pass .ring{background:var(--pass-soft);color:var(--pass)} .v-hero.warn .ring{background:var(--warn-soft);color:var(--warn)} .v-hero.fail .ring{background:var(--fail-soft);color:var(--fail)}
+  .v-hero .vt{font-weight:700;font-size:16px;color:var(--ink)}
+  .v-hero.pass .vt{color:var(--pass)} .v-hero.warn .vt{color:var(--warn)} .v-hero.fail .vt{color:var(--fail)}
+  .v-hero .vs{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .meter{display:flex;height:9px;border-radius:6px;overflow:hidden;background:var(--line-soft);width:100%;max-width:340px;margin-top:11px}
+  .meter span{display:block;height:100%}
+  .meter .mf{background:var(--fail)} .meter .mw{background:var(--warn)} .meter .mo{background:var(--pass)}
+  .mlegend{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .mlegend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+  .sev-ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto}
+  .sev-ic svg{width:18px;height:18px}
+  .sev-ic.fatal{background:var(--fail-soft);color:var(--fail)} .sev-ic.warning{background:var(--warn-soft);color:var(--warn)} .sev-ic.info{background:var(--ai-soft);color:var(--ai)} .sev-ic.pass{background:var(--pass-soft);color:var(--pass)}
+  .finding{display:flex;gap:12px;align-items:flex-start} .finding .fbody{flex:1;min-width:0}
+  /* ---- pictorial: test lab ---- */
+  .lab-summary{display:flex;align-items:center;gap:18px;padding:16px 18px;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);box-shadow:var(--sh);margin-bottom:16px}
+  .donut{position:relative;width:74px;height:74px;flex:0 0 auto}
+  .donut .dlabel{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:15px;color:var(--ink)}
+  .lab-summary .lt{font-weight:700;font-size:15px;color:var(--ink)}
+  .lab-summary .ls{font-size:12.5px;color:var(--muted);margin-top:3px;max-width:440px}
+  .lab-summary .seg{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;align-items:center}
+  .lab-summary .seg span{display:inline-flex;align-items:center;gap:5px} .lab-summary .seg svg{width:13px;height:13px} .lab-summary .seg b{font-family:var(--mono);color:var(--ink-2)}
+  .cat-h{display:flex;align-items:center;gap:8px}
+  .cat-h .ci{color:var(--ai);display:inline-flex} .cat-h .ci svg{width:15px;height:15px}
+  .scn .status{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--line);color:var(--faint);background:#fbfcfe}
+  .scn .status svg{width:15px;height:15px}
+  .scn .status.ok{background:var(--pass-soft);border-color:transparent;color:var(--pass)}
+  .scn .status.miss{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+  .flow{display:flex;align-items:center;gap:8px;margin-top:11px;flex-wrap:wrap}
+  .fnode{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:#fbfcfe;color:var(--ink-2)}
+  .fnode svg{width:13px;height:13px}
+  .fnode.valid{color:var(--pass);border-color:transparent;background:var(--pass-soft)}
+  .fnode.mut.fatal{color:var(--fail);border-color:transparent;background:var(--fail-soft)}
+  .fnode.mut.warning{color:var(--warn);border-color:transparent;background:var(--warn-soft)}
+  .fnode.rule{color:var(--ai);border-color:transparent;background:var(--ai-soft);font-family:var(--mono)}
+  .fnode.passnode{color:var(--pass);border-color:transparent;background:var(--pass-soft);font-family:var(--mono)}
+  .farrow{color:var(--faint);display:inline-flex} .farrow svg{width:15px;height:15px}
 
   /* ---------- invoice view (printable, light paper) ---------- */
   .view-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
@@ -563,22 +603,60 @@ function renderDetails(a){
   <div class="card"><h4>Business terms detected</h4><div class="terms">${terms}</div></div>`;
 }
 
+const ICONS={
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  x:'<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>',
+  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  info:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  scissors:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  play:'<polygon points="5 3 19 12 5 21 5 3"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  dot:'<circle cx="12" cy="12" r="3.5"/>',
+  equals:'<line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/>',
+  arrow:'<line x1="4" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  Identity:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M14 9h4M14 13h4M6 16h7"/>',
+  Temporal:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+  Parties:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  Tax:'<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  Currency:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  Totals:'<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/>',
+  Structure:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  Baseline:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
+};
+function ic(n){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.dot}</svg>`;}
+function donut(pass,total){const r=30,c=2*Math.PI*r,frac=total?pass/total:0;const col=!total||pass===total?"var(--pass)":(pass===0?"var(--faint)":"var(--warn)");
+  return `<div class="donut"><svg viewBox="0 0 74 74" width="74" height="74" style="transform:rotate(-90deg)"><circle cx="37" cy="37" r="${r}" fill="none" style="stroke:var(--line-soft)" stroke-width="8"/><circle cx="37" cy="37" r="${r}" fill="none" style="stroke:${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c*(1-frac)).toFixed(1)}"/></svg><div class="dlabel">${total?pass+"/"+total:"–"}</div></div>`;}
+function setStatus(node,ok){const st=node.querySelector("[data-status]");if(!st)return;st.className="status "+(ok?"ok":"miss");st.innerHTML=ic(ok?"check":"x");}
+
 function renderValidation(a,findings){
   const fatal=findings.filter(f=>f.sev==="fatal").length,warn=findings.filter(f=>f.sev==="warning").length;
-  let cls,vt,vs;
-  if(fatal){cls="fail";vt="Would be rejected";vs=`${fatal} fatal issue${fatal>1?"s":""} the schematron would block.`;}
-  else if(warn){cls="warn";vt="Valid, with warnings";vs=`Passes fatal checks; ${warn} item${warn>1?"s":""} to review.`;}
-  else{cls="pass";vt="Passes built-in checks";vs="No blocking issues detected.";}
-  const items=findings.filter(f=>f.sev!=="info"||(!fatal&&!warn)).map(f=>`<div class="finding ${f.sev}"><div class="fh"><span class="sev ${f.sev}">${f.sev}</span><span class="rid">${esc(f.id)}</span>${f.term&&f.term!=="—"?`<span class="bt">${esc(f.term)}</span>`:""}</div><div class="msg">${esc(f.msg)}</div><div class="ex">${f.ex}</div>${f.fix?`<div class="fix"><b>Fix:</b> ${f.fix}</div>`:""}</div>`).join("");
-  return `<div class="verdict ${cls}"><span class="dot"></span><div><div class="vt">${vt}</div><div class="vs">${vs}</div></div><div class="counts"><span class="f">${fatal} fatal</span><span class="w">${warn} warning</span><span class="o">pass</span></div></div>${items}<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
+  const ruleTotal=Object.keys(RULE_KB).length;const okCount=Math.max(0,ruleTotal-fatal-warn);
+  let cls,vt,vs,hi;
+  if(fatal){cls="fail";hi="x";vt="Would be rejected";vs=`${fatal} fatal issue${fatal>1?"s":""} the schematron would block.`;}
+  else if(warn){cls="warn";hi="alert";vt="Valid, with warnings";vs=`Passes fatal checks; ${warn} item${warn>1?"s":""} to review.`;}
+  else{cls="pass";hi="check";vt="Passes built-in checks";vs="No blocking issues detected.";}
+  const tot=fatal+warn+okCount;const w=n=>tot?(n/tot*100).toFixed(1)+"%":"0%";
+  const meter=`<div class="meter"><span class="mo" style="width:${w(okCount)}"></span><span class="mw" style="width:${w(warn)}"></span><span class="mf" style="width:${w(fatal)}"></span></div><div class="mlegend"><span><i style="background:var(--pass)"></i>${okCount} of ${ruleTotal} checks passed</span><span><i style="background:var(--warn)"></i>${warn} warning${warn===1?"":"s"}</span><span><i style="background:var(--fail)"></i>${fatal} fatal</span></div>`;
+  const hero=`<div class="v-hero ${cls}"><div class="ring">${ic(hi)}</div><div style="flex:1;min-width:0"><div class="vt">${vt}</div><div class="vs">${vs}</div>${meter}</div></div>`;
+  const items=findings.filter(f=>f.sev!=="info"||(!fatal&&!warn)).map(f=>{
+    const isOk=f.id==="AE-OK-00";const sevCls=isOk?"pass":f.sev;const sevIc=isOk?"check":(f.sev==="fatal"?"x":f.sev==="warning"?"alert":"info");
+    return `<div class="finding ${f.sev}"><div class="sev-ic ${sevCls}">${ic(sevIc)}</div><div class="fbody"><div class="fh"><span class="sev ${f.sev}">${esc(f.sev)}</span><span class="rid">${esc(f.id)}</span>${f.term&&f.term!=="—"?`<span class="bt">${esc(f.term)}</span>`:""}</div><div class="msg">${esc(f.msg)}</div><div class="ex">${f.ex}</div>${f.fix?`<div class="fix"><b>Fix:</b> ${f.fix}</div>`:""}</div></div>`;}).join("");
+  return hero+items+`<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
 }
 
 function renderLab(src){
-  const s=src.scenarios||[];const cats=[...new Set(s.map(x=>x.category))];
-  let html=`<div class="lab-head"><div class="li">Each scenario mutates <b>${esc(src.name)}</b> to exercise one rule. Run a single check, run them all, or download the broken XML.</div><button class="btn ai" id="runAllBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run all checks</button></div><div class="lab-sum" id="labSum"></div>`;
-  cats.forEach(cat=>{html+=`<div class="cat-h">${esc(cat)}</div>`;
+  const s=src.scenarios||[];const cats=[...new Set(s.map(x=>x.category))];const neg=s.filter(x=>x.kind==="negative").length;
+  let html=`<div class="lab-head"><div class="li">Each scenario takes <b>${esc(src.name)}</b> and injects one fault, then checks that the validator catches it. Run one, run them all, or download the broken XML.</div><button class="btn ai" id="runAllBtn">${ic("play")} Run all checks</button></div>`;
+  html+=`<div class="lab-summary" id="labSum">${donut(0,s.length)}<div><div class="lt">${s.length} scenarios ready</div><div class="ls">${neg} fault injections across ${cats.length} categories, plus 1 baseline control. Press “Run all checks” to grade them — each should fire its expected rule.</div></div></div>`;
+  cats.forEach(cat=>{html+=`<div class="cat-h"><span class="ci">${ic(cat)}</span>${esc(cat)}</div>`;
     s.forEach((sc,i)=>{if(sc.category!==cat)return;
-      html+=`<div class="scn" data-i="${i}"><div class="sh"><span class="kind ${sc.kind}">${sc.kind}</span><span class="st">${esc(sc.title)}</span></div><div class="se">${esc(sc.explain)}</div><div class="expect">Expected rule: <span class="rid">${esc(sc.rule)}</span></div><div class="scn-actions"><button class="btn primary" data-act="run">Run check</button><button class="btn" data-act="dl">Download XML</button><button class="btn" data-act="add">Add as invoice</button></div><div class="runres" data-res></div></div>`;});});
+      const flowMut=sc.kind==="positive"
+        ?`<span class="fnode">${ic("equals")} unchanged</span><span class="farrow">${ic("arrow")}</span><span class="fnode passnode">${ic("check")} passes</span>`
+        :`<span class="fnode mut ${sc.severity}">${ic("scissors")} ${esc(sc.severity)} fault</span><span class="farrow">${ic("arrow")}</span><span class="fnode rule">${ic("flag")} ${esc(sc.rule)}</span>`;
+      html+=`<div class="scn" data-i="${i}"><div class="sh"><span class="status idle" data-status>${ic("dot")}</span><span class="kind ${sc.kind}">${sc.kind}</span><span class="st">${esc(sc.title)}</span></div><div class="se">${esc(sc.explain)}</div><div class="flow"><span class="fnode valid">${ic("file")} valid</span><span class="farrow">${ic("arrow")}</span>${flowMut}</div><div class="scn-actions"><button class="btn primary" data-act="run">${ic("play")} Run check</button><button class="btn" data-act="dl">${ic("download")} XML</button><button class="btn" data-act="add">${ic("plus")} Add as invoice</button></div><div class="runres" data-res></div></div>`;});});
   return html;
 }
 function runScenario(sc){
@@ -592,15 +670,16 @@ function runScenario(sc){
 }
 function wireLab(src){
   document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");
-    node.querySelector('[data-act="run"]').onclick=()=>{const r=runScenario(sc);res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;};
+    node.querySelector('[data-act="run"]').onclick=()=>{const r=runScenario(sc);res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);};
     node.querySelector('[data-act="dl"]').onclick=()=>download(sc.mutate(),src.name.replace(/\.xml$/i,"")+"__"+sc.rule+".xml");
     node.querySelector('[data-act="add"]').onclick=()=>addSource(src.name.replace(/\.xml$/i,"")+" ["+sc.rule+"].xml",sc.mutate());});
   const rab=$("runAllBtn");if(rab)rab.onclick=()=>runAll(src);
 }
 function runAll(src){
   let pass=0;const total=(src.scenarios||[]).length;
-  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const r=runScenario(sc);if(r.ok)pass++;res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;});
-  const sum=$("labSum");if(sum){const ok=pass===total;sum.className="lab-sum show "+(ok?"ok":"bad");sum.innerHTML=`<span class="ring">${pass}/${total}</span><div><div class="lt">${ok?"All scenarios behaved as expected":"Some scenarios diverged"}</div><div class="ls">Each negative fired its expected rule; the control passed.</div></div>`;}
+  document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const r=runScenario(sc);if(r.ok)pass++;res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);});
+  const sum=$("labSum");if(sum){const ok=pass===total;
+    sum.innerHTML=donut(pass,total)+`<div><div class="lt">${ok?"All scenarios behaved as expected":pass+" of "+total+" behaved as expected"}</div><div class="ls">${ok?"Every fault injection fired its expected rule, and the baseline control passed.":"Most fired correctly. Divergences usually mean the source invoice is already non-compliant — open each card to see what fired."}</div><div class="seg"><span style="color:var(--pass)">${ic("check")} <b>${pass}</b> as expected</span><span style="color:var(--warn)">${ic("alert")} <b>${total-pass}</b> diverged</span></div></div>`;}
   return{pass,total};
 }
 
