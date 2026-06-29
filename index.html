@@ -442,9 +442,11 @@ const KB={
     E:{name:"Exempt",rate:"—",note:"Outside VAT (e.g. certain financial services). No VAT and no input recovery."},
     AE:{name:"Reverse charge",rate:"0% charged",note:"Buyer self-accounts for VAT (common in cross-border B2B). Seller charges no VAT; an exemption reason is expected."},
     O:{name:"Out of scope",rate:"—",note:"Not a VAT supply."},
+    N:{name:"Standard rate (margin)",rate:"5% on margin",note:"Profit-margin scheme: tax amount is 0 with a rate > 0, only on lines, never on document allowances/charges. Allowed only under the margin transaction type."},
     G:{name:"Free export",rate:"0%",note:"Export of goods."}
   },
-  docTypes:{"380":"Commercial Invoice","388":"Tax Invoice","381":"Credit Note","383":"Debit Note","389":"Self-billed Invoice","261":"Self-billed Credit Note","386":"Prepayment Invoice"},
+  docTypes:{"380":"Tax Invoice","381":"Tax Credit Note","389":"Self-Billing Invoice","261":"Self-Billing Credit Note","480":"Invoice (Out of Scope)","81":"Credit Note (Out of Scope)","383":"Debit Note","386":"Prepayment Invoice","388":"Tax Invoice"},
+  txnTypes:{"00000000":"Standard","10000000":"Free Trade Zone","01000000":"Deemed Supply","00100000":"Profit Margin Scheme","00010000":"Summary Invoice","00001000":"Continuous Supply","00000100":"Disclosed Agent Billing","00000010":"E-commerce Supply","00000001":"Exports"},
   concepts:{
     asp:"An ASP (Accredited Service Provider) is a Ministry of Finance–certified Peppol access point. UAE businesses route invoices through an ASP, which validates, transmits over Peppol, and reports the tax data to the FTA.",
     peppol:"Peppol is a network for exchanging business documents: any system connected via an access point can exchange invoices with any other, without point-to-point links.",
@@ -470,7 +472,14 @@ const RULE_KB={
   "AE-ALLOW-DUP-01":"An allowance/charge reason may appear at most once (mirrors ibr-sr-30).",
   "AE-MATH-01":"Tax-inclusive total must equal tax-exclusive plus VAT.",
   "AE-MATH-02":"Line amounts must sum to the declared line-extension total.",
-  "AE-NEG-01":"Negative amounts belong on a credit note, not an invoice."
+  "AE-NEG-01":"Negative amounts belong on a credit note, not an invoice.",
+  "ibr-122-ae":"Out-of-scope documents (480/81) may only use VAT categories E, O, or Z.",
+  "ibr-151-ae":"Tax invoices (380/381) must have at least one line not categorised E or O.",
+  "ibr-116-ae":"VAT code N is allowed only under the margin scheme, and the margin scheme allows only N.",
+  "ibr-103-ae":"Reverse charge (AE) requires the buyer VAT TRN (IBT-048).",
+  "ibr-121-ae":"Exempt (E) lines must not provide a VAT rate.",
+  "ibr-120-ae":"Zero-rated (Z) lines must state an explicit 0 rate.",
+  "AE-EXEMPT-01":"Exempt (E) lines require an exemption reason code (e.g. DL8.46.x)."
 };
 
 const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null};
@@ -500,6 +509,7 @@ function parsePintAe(xml){
   res.typeCode=txt(child(root,"InvoiceTypeCode"))||txt(child(root,"CreditNoteTypeCode"));
   res.typeName=KB.docTypes[res.typeCode]||(rn==="CreditNote"?"Credit Note":"Invoice");
   res.currency=txt(child(root,"DocumentCurrencyCode"));
+  res.profileExec=txt(child(root,"ProfileExecutionID"));res.txnType=KB.txnTypes[res.profileExec]||"";res.margin=res.profileExec.length>=3&&res.profileExec[2]==="1";
   function party(w){const wrap=child(root,w);const p=child(wrap,"Party");if(!p)return{name:"",trn:"",country:"",addr:""};
     const name=txt(deep(p,["PartyLegalEntity","RegistrationName"]))||txt(deep(p,["PartyName","Name"]));
     let trn="";for(const pts of children(p,"PartyTaxScheme")){const id=txt(child(pts,"CompanyID"));if(id){trn=id;break;}}
@@ -510,7 +520,7 @@ function parsePintAe(xml){
   res.seller=party("AccountingSupplierParty");res.buyer=party("AccountingCustomerParty");
   res.taxCategories=[];const tt=child(root,"TaxTotal");res.taxTotal=num(txt(child(tt,"TaxAmount")));
   for(const st of findAll(root,"TaxSubtotal")){const cat=child(st,"TaxCategory");
-    res.taxCategories.push({id:txt(child(cat,"ID"))||"?",percent:txt(child(cat,"Percent")),taxable:num(txt(child(st,"TaxableAmount"))),tax:num(txt(child(st,"TaxAmount")))});}
+    res.taxCategories.push({id:txt(child(cat,"ID"))||"?",percent:txt(child(cat,"Percent")),taxable:num(txt(child(st,"TaxableAmount"))),tax:num(txt(child(st,"TaxAmount"))),exemptReason:txt(child(cat,"TaxExemptionReason"))||txt(child(cat,"TaxExemptionReasonCode"))});}
   res.allowances=[];for(const ac of children(root,"AllowanceCharge")){
     res.allowances.push({charge:txt(child(ac,"ChargeIndicator"))==="true",reasons:children(ac,"AllowanceChargeReason").map(txt),amount:num(txt(child(ac,"Amount")))});}
   const lmt=child(root,"LegalMonetaryTotal");
@@ -550,6 +560,17 @@ function validate(a){
   if(t.lineExt!=null&&a.lines.length){const sum=a.lines.reduce((s,l)=>s+(l.amount||0),0);
     if(approx(t.lineExt,sum)===false)add("AE-MATH-02","warning","BT-106","Sum of line amounts does not equal the declared line-extension total.","Line total declared "+fmt(t.lineExt)+"; lines add up to "+fmt(sum)+".","Reconcile line amounts with the header total.");}
   if(a.root==="Invoice"&&a.lines.some(l=>l.amount!=null&&l.amount<0))add("AE-NEG-01","warning","BT-126","Invoice contains negative line amounts.","Negative amounts normally belong on a credit note, not an invoice.","Issue a credit note (type 381) instead.");
+  const catIds=a.taxCategories.map(c=>c.id);
+  if((a.typeCode==="480"||a.typeCode==="81")&&catIds.some(c=>c==="S"||c==="AE"||c==="N"))add("ibr-122-ae","fatal","IBT-151","Out-of-scope document uses a taxable VAT category.","Document types 480 and 81 (out of scope) may only use E, O, or Z.","Use only E, O, or Z categories on out-of-scope documents.");
+  if((a.typeCode==="380"||a.typeCode==="381")&&catIds.length&&catIds.every(c=>c==="E"||c==="O"))add("ibr-151-ae","fatal","IBT-151","Tax invoice has only exempt / out-of-scope lines.","Types 380 and 381 must have at least one line with a category other than E or O.","Include at least one S, AE, Z, or N line.");
+  if(a.margin&&catIds.some(c=>c!=="N"))add("ibr-116-ae","fatal","BTAE-02","Margin-scheme invoice uses a non-margin VAT category.","Under the margin scheme (BTAE-02 = XX1XXXXX) only VAT code N is allowed.","Use only category N on a margin-scheme invoice.");
+  else if(!a.margin&&catIds.includes("N"))add("ibr-116-ae","fatal","BTAE-02","VAT code N used outside the margin scheme.","Category N (margin) is only allowed when the transaction type is the profit margin scheme.","Set the margin transaction type or use a different VAT category.");
+  if(catIds.includes("AE")&&!a.buyer.trn)add("ibr-103-ae","fatal","IBT-048","Reverse-charge invoice is missing the buyer TRN.","When any line is reverse charge (AE), the buyer VAT identifier (IBT-048) is mandatory.","Provide the buyer TRN under the customer <code>PartyTaxScheme</code>.");
+  a.taxCategories.forEach(c=>{
+    if(c.id==="E"&&c.percent!==""&&c.percent!=null)add("ibr-121-ae","warning","IBT-152","Exempt (E) line carries a VAT rate.","For VAT = E the rate must not be provided in the tax breakdown.","Remove the <code>Percent</code> from the exempt subtotal.");
+    if(c.id==="Z"&&(c.percent===""||c.percent==null||num(c.percent)!==0))add("ibr-120-ae","warning","IBT-152","Zero-rated (Z) line does not state a 0 rate.","For VAT = Z the rate must be explicitly set to 0.","Set the <code>Percent</code> to 0 on the zero-rated subtotal.");
+    if(c.id==="E"&&!c.exemptReason)add("AE-EXEMPT-01","warning","BTAE-09","Exempt (E) line has no exemption reason.","An exemption reason code/text is expected when VAT = E (e.g. DL8.46.x).","Add a <code>TaxExemptionReason</code> or <code>TaxExemptionReasonCode</code> to the exempt subtotal.");
+  });
   if(!f.length)add("AE-OK-00","info","—","No issues detected by the built-in checks.","This invoice passes InvoiceFlow's heuristic checks. The certified schematron may apply deeper rules.","Validate against the accredited schematron before go-live.");
   return f;
 }
@@ -582,6 +603,14 @@ function generateScenarios(a){
   // Structure
   mk("Structure","Duplicate an allowance reason","negative","AE-ALLOW-DUP-01","fatal","Adds a second reason to an allowance — the reason-appears-once rule (ibr-sr-30).",()=>mut(raw,d=>{let ac=findFirst(d.documentElement,"AllowanceCharge");if(!ac){ac=el(d,"cac:AllowanceCharge");ac.appendChild(el(d,"cbc:ChargeIndicator","false"));ac.appendChild(el(d,"cbc:AllowanceChargeReason","Promotion"));ac.appendChild(el(d,"cbc:Amount","0"));const l=child(d.documentElement,"LegalMonetaryTotal");d.documentElement.insertBefore(ac,l||null);}const r=child(ac,"AllowanceChargeReason")||el(d,"cbc:AllowanceChargeReason","Promotion");ac.appendChild(r.cloneNode(true));}));
   mk("Structure","Make a line amount negative","negative","AE-NEG-01","warning","Puts a credit-note style negative on a tax invoice.",()=>mut(raw,d=>{const ln0=findFirst(d.documentElement,"InvoiceLine");const lea=ln0?child(ln0,"LineExtensionAmount"):null;if(lea)lea.textContent="-"+Math.abs(num(lea.textContent)||100);}));
+  // Combinations
+  mk("Combinations","Out-of-scope doc with standard VAT","negative","ibr-122-ae","fatal","Marks the invoice out-of-scope (480) while keeping a 5% line — a forbidden combination.",()=>mut(raw,d=>{const e=child(d.documentElement,"InvoiceTypeCode")||child(d.documentElement,"CreditNoteTypeCode");if(e)e.textContent="480";}));
+  mk("Combinations","Tax invoice with only exempt lines","negative","ibr-151-ae","fatal","Sets a 380 tax invoice whose only line is exempt — it must have a taxable line.",()=>mut(raw,d=>{const e=child(d.documentElement,"InvoiceTypeCode")||child(d.documentElement,"CreditNoteTypeCode");if(e)e.textContent="380";findAll(d.documentElement,"TaxCategory").forEach(c=>{const id=child(c,"ID");if(id&&id.textContent==="S")id.textContent="E";});}));
+  mk("Combinations","Margin scheme with standard VAT","negative","ibr-116-ae","fatal","Flags the margin transaction type but keeps category S instead of N.",()=>mut(raw,d=>{const root=d.documentElement;let e=child(root,"ProfileExecutionID");if(!e){const ref=child(root,"ID")||child(root,"CustomizationID");const ns=ref?ref.namespaceURI:null;e=ns?d.createElementNS(ns,"cbc:ProfileExecutionID"):el(d,"cbc:ProfileExecutionID");e.textContent="00100000";const anchor=child(root,"ProfileID")||child(root,"CustomizationID");if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(e,anchor.nextSibling);else root.insertBefore(e,root.firstChild);}else e.textContent="00100000";}));
+  mk("Combinations","Reverse charge without buyer TRN","negative","ibr-103-ae","fatal","Switches a line to reverse charge (AE) and drops the mandatory buyer TRN.",()=>mut(raw,d=>{const c=findFirst(d.documentElement,"TaxCategory");if(c){const id=child(c,"ID");if(id)id.textContent="AE";}const p=findFirst(d.documentElement,"AccountingCustomerParty");findAll(p||d.documentElement,"PartyTaxScheme").forEach(n=>n.remove());}));
+  mk("Combinations","Exempt line carrying a VAT rate","negative","ibr-121-ae","warning","Relabels a line exempt (E) but leaves a 5% rate that must not be present.",()=>mut(raw,d=>{const c=findFirst(d.documentElement,"TaxCategory");if(c){const id=child(c,"ID");if(id)id.textContent="E";}}));
+  mk("Combinations","Zero-rated line without a 0 rate","negative","ibr-120-ae","warning","Relabels a line zero-rated (Z) but keeps a non-zero rate instead of 0.",()=>mut(raw,d=>{const c=findFirst(d.documentElement,"TaxCategory");if(c){const id=child(c,"ID");if(id)id.textContent="Z";}}));
+  mk("Combinations","Exempt line missing its reason","negative","AE-EXEMPT-01","warning","Makes a line exempt (E) with no exemption reason code supplied.",()=>mut(raw,d=>{const c=findFirst(d.documentElement,"TaxCategory");if(c){const id=child(c,"ID");if(id)id.textContent="E";const p=child(c,"Percent");if(p)p.remove();}}));
   // Baseline
   mk("Baseline","Unmodified copy (control)","positive","AE-OK-00","info","An unchanged copy — should pass every check.",()=>raw);
   return S;
@@ -655,7 +684,7 @@ function renderDetails(a){
   const dl=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   return `<div class="toolbar"><span class="vh">Decoded data</span><div class="tb-actions"><button class="btn" id="expJson">${dl} Export JSON</button><button class="btn" id="expCsv">${dl} Lines CSV</button></div></div>
   <div class="card"><div class="dx-head"><div class="dx-id">${f(a.id)}<span class="sub">Invoice number · BT-1</span></div><span class="dx-type">${esc(a.typeName)}${a.typeCode?" · "+esc(a.typeCode):""}</span></div>
-    <div class="kvgrid"><div class="kv"><span class="kk">Issue date <span class="bt">BT-2</span></span><span class="kvv mono">${f(a.issueDate)}</span></div>${a.dueDate?`<div class="kv"><span class="kk">Due date <span class="bt">BT-9</span></span><span class="kvv mono">${esc(a.dueDate)}</span></div>`:""}<div class="kv"><span class="kk">Currency <span class="bt">BT-5</span></span><span class="kvv mono">${f(a.currency)}</span></div><div class="kv"><span class="kk">Line items</span><span class="kvv">${a.lines.length}</span></div></div></div>
+    <div class="kvgrid"><div class="kv"><span class="kk">Issue date <span class="bt">BT-2</span></span><span class="kvv mono">${f(a.issueDate)}</span></div>${a.dueDate?`<div class="kv"><span class="kk">Due date <span class="bt">BT-9</span></span><span class="kvv mono">${esc(a.dueDate)}</span></div>`:""}<div class="kv"><span class="kk">Currency <span class="bt">BT-5</span></span><span class="kvv mono">${f(a.currency)}</span></div>${(a.txnType||a.profileExec)?`<div class="kv"><span class="kk">Transaction type <span class="bt">BTAE-02</span></span><span class="kvv">${esc(a.txnType||a.profileExec)}</span></div>`:""}<div class="kv"><span class="kk">Line items</span><span class="kvv">${a.lines.length}</span></div></div></div>
   <div class="card"><h4>Parties</h4><div class="parties">${party("Seller","BT-27","BT-31",a.seller)}${party("Buyer","BT-44","BT-48",a.buyer)}</div></div>
   <div class="card"><h4>Tax &amp; totals</h4><div class="totals"><div class="tot"><div class="k">Lines <span class="bt">BT-106</span></div><div class="v">${fmt(a.totals.lineExt)}</div></div><div class="tot"><div class="k">Net <span class="bt">BT-109</span></div><div class="v">${fmt(a.totals.taxExcl)}</div></div><div class="tot"><div class="k">VAT <span class="bt">BT-110</span></div><div class="v">${fmt(a.taxTotal)}</div></div><div class="tot payable"><div class="k">Payable <span class="bt">BT-115</span></div><div class="v">${esc(a.currency||"")} ${fmt(a.totals.payable)}</div></div></div>${a.taxCategories.length?`<div class="subcap">VAT breakdown by category</div><table class="grid"><thead><tr><th>Category <span class="bt">BT-118</span></th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">VAT</th></tr></thead><tbody>${cats}</tbody></table>`:""}</div>
   ${a.lines.length?`<div class="card"><h4>Line items (${a.lines.length})</h4><table class="grid"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th>VAT</th><th class="num">Amount</th></tr></thead><tbody>${lines}</tbody></table>${a.lines.length>40?`<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Showing first 40 of ${a.lines.length} lines.</div>`:""}</div>`:""}
