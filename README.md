@@ -1,128 +1,284 @@
-# InvoiceFlow Test Runner (backend)
-
-A small Python service whose job is to **run the PINT-AE test scenarios** — the
-same fault-injection suite the browser app uses, but server-side so it can run in
-CI, in batch, and (optionally) against the **certified schematron**.
-
-For each invoice it: parses the UBL XML → generates the test scenarios (each
-injects one fault) → mutates the XML → validates the mutant → checks the right
-rule fired. A positive "control" scenario is left untouched and must pass.
-
-The validator is **pluggable**. Out of the box it uses the heuristic `AE-` rules
-(identical to the browser app, so results match). Point it at the official
-schematron and it grades against the real rules instead — no code change.
-
+# InvoiceFlow
+ 
+A workspace for **UAE PINT-AE e-invoices**. Load a UBL invoice and InvoiceFlow
+renders it as a human-readable document, decodes every field, validates it against
+PINT-AE rules, generates a suite of test scenarios that deliberately break it to
+prove the validator works, compares invoices side by side, and answers questions
+through a built-in assistant that can also operate the app for you.
+ 
+The project has **two parts**:
+ 
+1. **Frontend** — a self-contained web app (one `index.html`) plus a tiny chat
+   proxy. All invoice processing runs in the browser; only chat messages leave the
+   device. Deploys as a static site on Vercel.
+2. **Backend** — a Python *test-runner* service that performs the same scenario
+   suite server-side, exposes it over HTTP and a CLI for CI/batch use, and can
+   grade against the **certified PINT-AE schematron**. Deploys as a container.
+Both share one scenario concept and are built to agree (both score 16/16 on the
+reference invoice), so what you see in the browser matches what CI enforces.
+ 
 ---
-
-## Layout
-
+ 
+## Why this exists
+ 
+The UAE is rolling out mandatory e-invoicing (phased through 2026–2027). Invoices
+become structured **UBL XML** exchanged over the **Peppol** network through
+accredited service providers (ASPs), validated against a **schematron** rulebook,
+with tax data reported to the Federal Tax Authority (FTA). Raw PINT-AE XML is hard
+to read and harder to debug. InvoiceFlow makes it legible, checkable, and testable.
+ 
+> **Important:** InvoiceFlow's built-in checks (rule IDs prefixed `AE-`) are
+> *heuristic stand-ins* that imitate common PINT-AE rules for early feedback and
+> learning. They are **not** the official accredited schematron. The backend can
+> be pointed at the real ruleset (see below); always validate against the
+> certified validator before going live.
+ 
+---
+ 
+## Architecture
+ 
+```mermaid
+flowchart LR
+    User([User · Browser])
+    CI([CI / CLI])
+ 
+    subgraph FE["Frontend — static site on Vercel"]
+      APP["index.html<br/>parse · validate · test · compare · agent"]
+      CHAT["api/chat.py<br/>Gemini proxy (keeps API key server-side)"]
+    end
+ 
+    subgraph BE["Backend — container host"]
+      API["FastAPI<br/>/test · /validate · /test/batch"]
+      ENG["Engine<br/>parse → mutate → grade"]
+      VAL{"Validator<br/>(pluggable)"}
+      HEUR["Heuristic AE- rules"]
+      SCH["Certified schematron<br/>via Saxon (saxonche)"]
+    end
+ 
+    User --> APP
+    APP -->|chat only| CHAT --> GEM[(Google Gemini)]
+    APP -. optional offload .-> API
+    CI --> API
+    API --> ENG --> VAL
+    VAL --> HEUR
+    VAL --> SCH
 ```
-app/
-  engine/
-    parse.py        UBL parser (namespace-agnostic, lxml)
-    rules.py        heuristic AE- validator (+ RULE_KB, verdict)
-    scenarios.py    scenario catalogue, XML mutation, grading
-    schematron.py   optional real-ruleset validator via Saxon (saxonche)
-    __init__.py     select_validator(): schematron if configured, else heuristic
-  report.py         JUnit + CSV serialisers
-  api.py            FastAPI app
-  cli.py            command-line runner
-  samples/          good.xml, bad.xml (identical to the browser app)
-tests/              pytest: engine + API
-Dockerfile, requirements.txt, run.sh
+ 
+**Design choice — client-heavy.** Parsing, validation, test generation, comparison,
+and exports all run in the browser, so the app keeps working with no server. The
+*only* thing that needs a backend in the frontend deployment is the chat, because
+it must hold an API key secretly. The **test-runner backend** is a separate,
+optional service for automation and certified validation.
+ 
+---
+ 
+## Repository structure
+ 
+The two parts can live as one monorepo or two repos.
+ 
 ```
-
-## Run it locally
-
-```bash
-pip install -r requirements.txt
-uvicorn app.api:app --reload --port 8000     # or: ./run.sh
+invoiceflow/                  # FRONTEND — deploy on Vercel (static + chat function)
+  index.html                  #   the entire app (no build step, no framework)
+  api/chat.py                 #   Gemini chat proxy (Python serverless, stdlib only)
+  vercel.json                 #   function config
+  .gitignore
+ 
+invoiceflow-backend/          # BACKEND — deploy on a container host
+  app/
+    engine/
+      parse.py                #   namespace-agnostic UBL parser (lxml)
+      rules.py                #   heuristic AE- validator (+ RULE_KB, verdict)
+      scenarios.py            #   scenario catalogue, XML mutation, grading
+      schematron.py           #   optional certified-ruleset validator (Saxon)
+      __init__.py             #   select_validator()
+    api.py                    #   FastAPI app
+    cli.py                    #   command-line runner
+    report.py                 #   JUnit + CSV serialisers
+    samples/                  #   good.xml, bad.xml (identical to the frontend)
+  tests/                      #   pytest: engine + API
+  Dockerfile  requirements.txt  run.sh
 ```
-
-Open <http://localhost:8000/docs> for the interactive API.
-
-## HTTP API
-
+ 
+---
+ 
+## Part 1 — Frontend web app
+ 
+### Features
+ 
+| Surface | What it does |
+|---|---|
+| **View** | Renders the XML as a clean, printable invoice (Print / Save as PDF). |
+| **Details** | Decoded data with each field tagged by its business-term code (BT-1, BT-110…): parties, VAT breakdown, totals, line items. Export decoded JSON or lines CSV. |
+| **Validation** | Verdict (accepted / warnings / rejected) with a status ring and a pass·warning·fatal meter; each issue shows severity, rule ID, explanation, and fix. Download an HTML report or export findings as JSON/CSV. |
+| **Test Lab** | ~16 scenarios that each inject one fault, grouped by category, with a results donut, a *valid → fault → rule fires* flow, live pass/fail icons, rule coverage, a before→after XML diff, batch runs across all invoices, and JSON / JUnit export. |
+| **Compare** | Two invoices side by side — parties, totals (with deltas), tax categories, and which validation issues each raises. |
+| **Assistant** | Grounded in the open invoice; answers questions **and** operates the app (open tabs, generate/run tests, add variants, load samples), showing what it did inline. |
+ 
+The workspace (invoices, active tab, chat) is **saved in the browser** and restored
+on return; a **Clear workspace** button wipes it. A **Private** badge reflects that
+everything but chat stays local.
+ 
+### Chat proxy (`api/chat.py`)
+ 
+A Vercel Python serverless function using only the standard library (no
+dependencies). It accepts `{ system, messages }`, maps them into Google Gemini's
+format, disables Gemini 2.5 "thinking" (so replies aren't empty), and returns
+`{ reply }`. The Gemini API key is read from an environment variable and never
+reaches the browser.
+ 
+### Deploy (Vercel)
+ 
+1. Push the `invoiceflow/` folder to a GitHub repo.
+2. Import the repo in Vercel (no build command — it's a static site + Python function).
+3. **Settings → Environment Variables** → add `GEMINI_API_KEY` (from Google AI Studio / Google Cloud).
+4. **Redeploy** (env vars only apply to a fresh deploy).
+5. Test with a real chat message. Visiting `/api/chat` should return
+   `{"status":"InvoiceFlow chat endpoint. Use POST."}`.
+> The app degrades gracefully: if the chat backend is absent or the key isn't set,
+> the assistant falls back to built-in answers and every other feature still works.
+> No `requirements.txt` is needed — the proxy is pure standard library.
+ 
+---
+ 
+## Part 2 — Backend test runner
+ 
+Its job is to **run the PINT-AE test scenarios** anywhere a browser can't: in CI,
+in batch, or against the certified rules.
+ 
+### How it works
+ 
+For each invoice: parse the UBL XML → generate the scenarios → each `mutate()`
+re-parses a *fresh* copy and injects one fault (delete the ID, blank a VAT rate,
+duplicate an allowance reason, corrupt a total…) → validate the mutant → grade
+(the expected rule must fire; the positive "control" must pass). Because every
+mutation starts from a clean copy, scenarios never contaminate each other.
+ 
+### Pluggable validator
+ 
+`select_validator()` chooses automatically:
+ 
+- **Heuristic** (default) — the same `AE-` rules as the browser, so results match.
+- **Certified schematron** (optional) — install `saxonche` and set
+  `PINT_SCHEMATRON_XSLT` to the official ruleset compiled to an SVRL-producing
+  XSLT. Validation then runs the real rules via Saxon (no JVM). Since certified
+  rule IDs differ from `AE-` IDs, negatives are graded as "the mutation made the
+  invoice invalid" and the positive control as "nothing fatal fired".
+### HTTP API
+ 
 | Method & path | Body | Returns |
 |---|---|---|
 | `GET /health` | — | `{status, validator}` |
 | `POST /validate` | `{xml}` | verdict + findings |
-| `POST /scenarios` | `{xml}` | the scenario list (metadata) |
+| `POST /scenarios` | `{xml}` | scenario list (metadata) |
 | `POST /test` | `{xml}` | graded report; `?format=junit` for XML |
 | `POST /test/batch` | `{invoices:[{name,xml}]}` | aggregated report; `?format=junit` |
-
-```bash
-curl -s localhost:8000/test \
-  -H 'Content-Type: application/json' \
-  --data "{\"xml\": $(python3 -c 'import json;print(json.dumps(open("app/samples/good.xml").read()))')}"
-# -> { "validator":"heuristic", "passed":16, "total":16, "all_passed":true, "results":[...] }
-```
-
-## CLI
-
+ 
+CORS is open so the browser app can call it. Interactive docs at `/docs`.
+ 
+### CLI
+ 
 ```bash
 python -m app.cli validate app/samples/bad.xml
-python -m app.cli test app/samples/good.xml
 python -m app.cli test app/samples/good.xml --junit results.xml --csv results.csv
 ```
-
-The `test` command exits non-zero if any scenario diverges, so it fails a CI build
-on a regression.
-
-## Tests
-
+ 
+`test` exits non-zero if any scenario diverges, so CI fails on a regression.
+ 
+### Run locally
+ 
 ```bash
-pytest -q     # 11 tests: engine proves 16/16, API endpoints, malformed input
+cd invoiceflow-backend
+pip install -r requirements.txt
+uvicorn app.api:app --reload --port 8000     # or ./run.sh
+pytest -q                                     # 11 tests; engine proves 16/16
 ```
-
-## Use the real PINT-AE schematron
-
-The heuristic rules are stand-ins. To grade against the certified ruleset:
-
-1. `pip install saxonche` (a Saxon wheel — no JVM needed).
-2. Get the official PINT-AE `.sch` files and compile them once to an
-   SVRL-producing XSLT (ISO Schematron skeleton / Saxon `iso_svrl_for_xslt2.xsl`).
-3. Set `PINT_SCHEMATRON_XSLT=/path/to/pint-ae.xsl`.
-
-`select_validator()` then routes validation and test grading through Saxon and
-reports `"validator":"schematron"`. Because the certified rule IDs differ from the
-`AE-` IDs, negative scenarios are graded as "the mutation made the invoice invalid
-(some assertion fired)" and the positive control as "nothing fatal fired".
-
-## Deploy
-
-This needs a normal Python runtime (not Vercel's serverless Python, because of
-`lxml`/Saxon). A container fits Render, Railway, Fly.io, or Cloud Run:
-
+ 
+### Deploy (container)
+ 
+Needs a normal Python runtime (it uses `lxml`, and Saxon for the real ruleset), so
+it goes on a container host — **Render, Railway, Fly.io, or Cloud Run** — not
+Vercel's Python serverless.
+ 
 ```bash
 docker build -t invoiceflow-backend .
 docker run -p 8000:8000 invoiceflow-backend
 ```
-
-## CI example (GitHub Actions)
-
-```yaml
-- run: pip install -r requirements.txt
-- run: python -m app.cli test path/to/invoice.xml --junit results.xml
-- uses: actions/upload-artifact@v4
-  with: { name: invoiceflow-results, path: results.xml }
-```
-
-## Wiring the browser app to this backend (optional)
-
-The frontend runs everything locally by default. To offload validation/testing to
-this service, have the Test Lab POST to `/test` and render the returned `results`.
-Sketch:
-
+ 
+---
+ 
+## How the two parts relate
+ 
+By default the frontend is fully standalone — it never needs the test-runner. If
+you want runs centralized (one source of truth, batch over many invoices, or
+certified-schematron grading), point the Test Lab at the backend's `/test` and
+render the returned `results`:
+ 
 ```js
 const BACKEND = "https://your-backend.example.com";
 async function runAllRemote(rawXml){
   const r = await fetch(`${BACKEND}/test`, {
-    method:"POST", headers:{"Content-Type":"application/json"},
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ xml: rawXml })
   });
-  return r.json();   // { passed, total, all_passed, results:[{rule,ok,detail,...}] }
+  return r.json();   // { passed, total, all_passed, results:[{rule, ok, detail, ...}] }
 }
 ```
-
-CORS is open by default so the browser can call it.
+ 
+The engines are intentionally kept in sync (both 16/16 on the reference invoice),
+so the browser's results and CI's results agree on the heuristic rules — and only
+the backend can flip to the certified validator.
+ 
+---
+ 
+## Configuration
+ 
+| Where | Variable | Purpose |
+|---|---|---|
+| Frontend (Vercel) | `GEMINI_API_KEY` | Enables the AI chat. Without it, the assistant uses built-in answers. |
+| Backend | `PINT_SCHEMATRON_XSLT` | Path to the compiled certified ruleset. Set it (with `saxonche` installed) to grade against the real schematron instead of the heuristics. |
+ 
+---
+ 
+## Testing & verification
+ 
+- **Backend:** `pytest` (11 tests) proves the engine fires the right rule for every
+  scenario (16/16), exercises the API endpoints and JUnit output, and checks
+  malformed input. The CLI's exit code makes it CI-ready.
+- **Frontend:** verified headlessly with jsdom — the actual page script is loaded,
+  the UI stubbed, and `parse → generate → run` exercised over every scenario to
+  confirm 16/16 and that the render functions emit valid markup.
+---
+ 
+## Limitations
+ 
+- **Heuristic, not certified.** The `AE-` checks imitate PINT-AE rules; they are not
+  the accredited schematron. Use the backend's schematron mode (or your ASP's
+  validator) before go-live.
+- **View is a reading aid**, not an official tax document.
+- **Local persistence.** The frontend keeps loaded invoices and chat in the
+  browser's storage so they survive a refresh; nothing is uploaded. Use **Clear
+  workspace**, and avoid loading sensitive invoices on a shared machine.
+- **Runtime split.** The frontend (static + a stdlib chat function) fits Vercel; the
+  backend (lxml/Saxon) needs a container host.
+---
+ 
+## Roadmap
+ 
+- Wire the frontend Test Lab to optionally run on the backend.
+- Ship and document the certified PINT-AE schematron ruleset for the backend's
+  Saxon path.
+- Custom-scenario builder (pick a field, choose an operation, declare the rule).
+- Arabic / RTL support; inline tooltips defining each BT code.
+---
+ 
+## Glossary
+ 
+- **PINT-AE** — the UAE localisation of the Peppol International invoice (UBL-based XML).
+- **UBL** — Universal Business Language; the XML schema invoices are written in.
+- **Peppol** — the network invoices are exchanged over; the UAE uses a 5-corner model.
+- **ASP** — Accredited Service Provider; a certified Peppol access point that validates, transmits, and reports invoices.
+- **FTA** — the UAE Federal Tax Authority.
+- **TRN** — Tax Registration Number; the 15-digit UAE VAT identifier.
+- **Schematron** — an executable rulebook; each rule is an assertion the invoice must satisfy.
+- **BT-xx** — standard *business term* codes (e.g. BT-1 = invoice number).
+- **Tax categories** — S (standard 5%), Z (zero-rated), E (exempt), AE (reverse charge), O (out of scope).
