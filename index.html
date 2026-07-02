@@ -371,6 +371,19 @@
     .inv-doc{box-shadow:none;border:none;max-width:100%;margin:0;padding:0}
     table.inv-lines thead th,.inv-totbox .grand{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
+  /* ---- information-architecture + form polish ---- */
+  .tab-div{width:1px;height:20px;background:var(--line);align-self:center;margin:0 8px;flex:0 0 auto}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .dz-sub{font-size:11px;color:var(--c-faint);margin-top:4px}
+  .col.canvas input:not([type=file]),.col.canvas select,.col.canvas textarea{outline:none;transition:border-color .12s,box-shadow .12s}
+  .col.canvas input:not([type=file]):focus,.col.canvas select:focus,.col.canvas textarea:focus{border-color:var(--ai)!important;box-shadow:0 0 0 3px var(--ai-soft)}
+  .col.canvas input:not([type=file]):hover:not(:focus),.col.canvas select:hover:not(:focus),.col.canvas textarea:hover:not(:focus){border-color:var(--muted)}
+  .sec-title{display:flex;align-items:baseline;gap:10px;margin:26px 0 14px;padding-top:18px;border-top:1px solid var(--line)}
+  .sec-title>span:first-child{font-size:15px;font-weight:700;color:var(--ink)}
+  .sec-sub{font-size:12px;color:var(--muted)}
+  .tools-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;margin-bottom:14px;box-shadow:var(--sh)}
+  .sec-note{font-size:12.5px;color:var(--muted);margin:2px 0 14px;line-height:1.55}
 </style>
 </head>
 <body>
@@ -391,9 +404,11 @@
       <div class="col-head"><span class="ttl">Invoices</span><button class="add-btn" id="addBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button></div>
       <div class="col-body">
         <div class="dropzone" id="dropzone">
-          <div>Drop <b>PINT-AE invoice XML</b> here</div>
+          <div>Drop a <b>PINT-AE invoice (XML)</b> here</div>
+          <div class="dz-sub">Other format? Use <b>Convert</b> to turn it into downloadable XML.</div>
           <div class="dz-actions">
             <button class="ghost" id="browseBtn">Browse</button>
+            <button class="ghost" id="convertBtn">Convert to XML</button>
             <button class="ghost" id="sampleBtn">Load sample</button>
             <button class="ghost" id="sampleBadBtn">Non-compliant sample</button>
             <button class="ghost" id="clearBtn">Clear workspace</button>
@@ -408,9 +423,12 @@
       <div class="tabs" id="tabs">
         <button class="tab active" data-tab="view">View</button>
         <button class="tab" data-tab="details">Details</button>
-        <button class="tab" data-tab="validation">Validation <span class="count" id="cntVal">0</span></button>
         <button class="tab" data-tab="lab">Test Lab <span class="count" id="cntLab">0</span></button>
         <button class="tab" data-tab="compare">Compare</button>
+        <span class="tab-div"></span>
+        <button class="tab" data-tab="build">Build</button>
+        <button class="tab" data-tab="convert">Convert</button>
+        <button class="tab" data-tab="batch">Batch</button>
       </div>
       <div class="col-body" id="canvasBody"></div>
     </main>
@@ -482,7 +500,7 @@ const RULE_KB={
   "AE-EXEMPT-01":"Exempt (E) lines require an exemption reason code (e.g. DL8.46.x)."
 };
 
-const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null};
+const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
 let idSeq=1;
 
 /* ---- XML helpers ---- */
@@ -640,17 +658,20 @@ function totalFindings(){return state.sources.reduce((s,x)=>s+((x.findings||[]).
 
 function render(){
   renderSources();const a=active();
-  $("cntVal").textContent=a&&a.analysis.ok?(a.findings||[]).filter(f=>f.sev!=="info").length:0;
-  $("cntLab").textContent=a&&a.analysis.ok?(a.scenarios||[]).length:0;
+  if(state.tab==="validation")state.tab="lab";
+  const _cv=$("cntVal");if(_cv)_cv.textContent="";
+  $("cntLab").textContent=a&&a.analysis.ok?((a.findings||[]).filter(f=>f.sev!=="info").length):0;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===state.tab));
   const body=$("canvasBody");
   if(state.tab==="compare"){body.innerHTML=renderCompare();wireCompare();return;}
+  if(state.tab==="build"){body.innerHTML=renderBuild();wireBuild();return;}
+  if(state.tab==="convert"){body.innerHTML=renderConvert();wireConvert();return;}
+  if(state.tab==="batch"){body.innerHTML=renderBatch();wireBatch();return;}
   if(!a){body.innerHTML="";body.appendChild(emptyNode());return;}
   if(!a.analysis.ok){body.innerHTML=`<div class="card"><h4>Cannot read file</h4><div class="finding fatal"><div class="msg">${esc(a.analysis.error)}</div><div class="ex">InvoiceFlow expects a UBL Invoice or CreditNote in PINT-AE form.</div></div></div>`;return;}
   if(state.tab==="view"){body.innerHTML=renderInvoiceView(a.analysis);const pb=$("printBtn");if(pb)pb.onclick=()=>window.print();}
   else if(state.tab==="details"){body.innerHTML=renderDetails(a.analysis);const j=$("expJson");if(j)j.onclick=()=>exportDecodedJSON(a.analysis);const c=$("expCsv");if(c)c.onclick=()=>exportLinesCSV(a.analysis);}
-  else if(state.tab==="validation"){body.innerHTML=renderValidation(a.analysis,a.findings);const j=$("vJson");if(j)j.onclick=()=>exportFindingsJSON(a);const c=$("vCsv");if(c)c.onclick=()=>exportFindingsCSV(a);const r=$("vReport");if(r)r.onclick=()=>exportReportHTML(a);}
-  else{body.innerHTML=renderLab(a);wireLab(a);}
+  else{body.innerHTML=renderTestLab(a);wireTestLab(a);}
 }
 function emptyNode(){const d=document.createElement("div");d.className="empty";
   d.innerHTML=`<svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
@@ -876,6 +897,7 @@ $("browseBtn").onclick=()=>$("fileInput").click();$("addBtn").onclick=()=>$("fil
 $("sampleBtn").onclick=()=>addSource("sample-tax-invoice.xml",SAMPLE_GOOD);
 $("sampleBadBtn").onclick=()=>addSource("non-compliant-invoice.xml",SAMPLE_BAD);
 $("clearBtn").onclick=()=>clearWorkspace();
+const _cvb=$("convertBtn");if(_cvb)_cvb.onclick=()=>{state.tab="convert";render();persist();};
 const dz=$("dropzone");
 ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
@@ -991,6 +1013,402 @@ $("chatInput").addEventListener("input",autosize);
 $("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit($("chatInput").value.trim());}});
 $("sendBtn").onclick=()=>submit($("chatInput").value.trim());
 (async function probe(){try{const r=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:"healthcheck",messages:[{role:"user",content:"ping"}]})});setMode(r.ok);}catch(e){setMode(false);}})();
+
+/* ================= NEW FEATURES (Build · Convert · Batch · Auto-fix · Backend) ================= */
+function r2(n){return Math.round((Number(n)||0)*100)/100;}
+function xmlEsc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function today(){return new Date().toISOString().slice(0,10);}
+
+/* ---- shared UBL generator: model -> PINT-AE XML ---- */
+function buildUBL(m){
+  m=m||{};
+  const cur=(m.currency||"AED").toUpperCase();
+  const type=String(m.typeCode||"388");
+  const isCredit=/^(381|261|81)$/.test(type);
+  const rootName=isCredit?"CreditNote":"Invoice";
+  const lineName=isCredit?"CreditNoteLine":"InvoiceLine";
+  const qtyName=isCredit?"CreditedQuantity":"InvoicedQuantity";
+  const lines=(m.lines||[]).filter(l=>l&&(l.name||l.price||l.qty||l.amount));
+  const groups={};let lineExt=0;
+  const lineXml=lines.map((l,i)=>{
+    const qty=Number(l.qty)||0, price=Number(l.price)||0;
+    const amt=r2(l.amount!=null&&l.amount!==""?l.amount:qty*price);
+    lineExt=r2(lineExt+amt);
+    const cat=(l.vatCat||"S").toUpperCase();
+    const pct=(cat==="E"||cat==="O"||cat==="AE")?null:(l.vatPct!=null&&l.vatPct!==""?Number(l.vatPct):(cat==="S"?5:cat==="Z"?0:cat==="N"?5:0));
+    const key=cat+"|"+(pct==null?"":pct);
+    groups[key]=groups[key]||{cat,pct,taxable:0,reason:""};
+    groups[key].taxable=r2(groups[key].taxable+amt);
+    if(l.exemptReason&&!groups[key].reason)groups[key].reason=l.exemptReason;
+    const pctXml=pct==null?"":`<cbc:Percent>${pct}</cbc:Percent>`;
+    return `  <cac:${lineName}><cbc:ID>${i+1}</cbc:ID><cbc:${qtyName} unitCode="${xmlEsc(l.unit||"EA")}">${qty||1}</cbc:${qtyName}><cbc:LineExtensionAmount currencyID="${cur}">${amt.toFixed(2)}</cbc:LineExtensionAmount>\n`+
+      `    <cac:Item><cbc:Name>${xmlEsc(l.name||("Item "+(i+1)))}</cbc:Name><cac:ClassifiedTaxCategory><cbc:ID>${cat}</cbc:ID>${pctXml}<cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>\n`+
+      `    <cac:Price><cbc:PriceAmount currencyID="${cur}">${(price||amt).toFixed(2)}</cbc:PriceAmount></cac:Price></cac:${lineName}>`;
+  }).join("\n");
+  let taxTotal=0;
+  const subs=Object.keys(groups).map(k=>{const g=groups[k];
+    let vat=(g.cat==="S"||g.cat==="Z")?r2(g.taxable*(g.pct||0)/100):0;
+    taxTotal=r2(taxTotal+vat);
+    const pctXml=g.pct==null?"":`<cbc:Percent>${g.pct}</cbc:Percent>`;
+    const reason=(g.cat==="E"||g.cat==="AE")?`<cbc:TaxExemptionReasonCode>${xmlEsc(g.reason||"VATEX-AE-OOS")}</cbc:TaxExemptionReasonCode>`:"";
+    return `    <cac:TaxSubtotal><cbc:TaxableAmount currencyID="${cur}">${g.taxable.toFixed(2)}</cbc:TaxableAmount><cbc:TaxAmount currencyID="${cur}">${vat.toFixed(2)}</cbc:TaxAmount>\n`+
+      `      <cac:TaxCategory><cbc:ID>${g.cat}</cbc:ID>${pctXml}${reason}<cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal>`;
+  }).join("\n");
+  const taxExcl=lineExt, taxIncl=r2(taxExcl+taxTotal);
+  const party=(role,p)=>{p=p||{};return `  <cac:Accounting${role}Party><cac:Party>\n`+
+    `    <cac:PartyName><cbc:Name>${xmlEsc(p.name||"")}</cbc:Name></cac:PartyName>\n`+
+    `    <cac:PostalAddress>${p.city?`<cbc:CityName>${xmlEsc(p.city)}</cbc:CityName>`:""}<cac:Country><cbc:IdentificationCode>${xmlEsc(p.country||"AE")}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>\n`+
+    (p.trn?`    <cac:PartyTaxScheme><cbc:CompanyID>${xmlEsc(p.trn)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>\n`:"")+
+    `    <cac:PartyLegalEntity><cbc:RegistrationName>${xmlEsc(p.name||"")}</cbc:RegistrationName></cac:PartyLegalEntity>\n`+
+    `  </cac:Party></cac:Accounting${role}Party>`;};
+  const typeEl=isCredit?"CreditNoteTypeCode":"InvoiceTypeCode";
+  return `<?xml version="1.0" encoding="UTF-8"?>\n`+
+`<${rootName} xmlns="urn:oasis:names:specification:ubl:schema:xsd:${rootName}-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">\n`+
+`  <cbc:CustomizationID>urn:peppol:pint:billing-1@ae-1</cbc:CustomizationID>\n`+
+`  <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>\n`+
+`  <cbc:ID>${xmlEsc(m.id||"INV-0001")}</cbc:ID>\n`+
+`  <cbc:IssueDate>${xmlEsc(m.issueDate||today())}</cbc:IssueDate>\n`+
+(m.dueDate?`  <cbc:DueDate>${xmlEsc(m.dueDate)}</cbc:DueDate>\n`:"")+
+`  <cbc:${typeEl}>${xmlEsc(type)}</cbc:${typeEl}>\n`+
+(m.note?`  <cbc:Note>${xmlEsc(m.note)}</cbc:Note>\n`:"")+
+`  <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>\n`+
+(m.profileExec?`  <cbc:ProfileExecutionID>${xmlEsc(m.profileExec)}</cbc:ProfileExecutionID>\n`:"")+
+party("Supplier",m.seller)+"\n"+party("Customer",m.buyer)+"\n"+
+`  <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${taxTotal.toFixed(2)}</cbc:TaxAmount>\n`+subs+`</cac:TaxTotal>\n`+
+`  <cac:LegalMonetaryTotal>\n`+
+`    <cbc:LineExtensionAmount currencyID="${cur}">${taxExcl.toFixed(2)}</cbc:LineExtensionAmount>\n`+
+`    <cbc:TaxExclusiveAmount currencyID="${cur}">${taxExcl.toFixed(2)}</cbc:TaxExclusiveAmount>\n`+
+`    <cbc:TaxInclusiveAmount currencyID="${cur}">${taxIncl.toFixed(2)}</cbc:TaxInclusiveAmount>\n`+
+`    <cbc:PayableAmount currencyID="${cur}">${taxIncl.toFixed(2)}</cbc:PayableAmount></cac:LegalMonetaryTotal>\n`+
+(lineXml?lineXml+"\n":"")+`</${rootName}>`;
+}
+
+/* ---- model helpers for import ---- */
+function normNum(v){if(v==null)return null;const n=parseFloat(String(v).replace(/[^0-9.\-]/g,""));return isNaN(n)?null:n;}
+function pick(o,keys){for(const k of keys){for(const kk in o){if(kk.toLowerCase().replace(/[^a-z0-9]/g,"")===k){return o[kk];}}}return undefined;}
+function jsonToModel(o){
+  o=o||{};
+  const g=(...k)=>pick(o,k);
+  const m={
+    id:g("id","invoiceno","invoicenumber","number","invid"),
+    issueDate:g("issuedate","date","invoicedate"),
+    dueDate:g("duedate"),
+    currency:(g("currency","currencycode","cur")||"AED"),
+    typeCode:String(g("typecode","invoicetypecode","type")||"388"),
+    profileExec:g("profileexecutionid","transactiontype","txntype"),
+    seller:{},buyer:{},lines:[]
+  };
+  const s=g("seller","supplier","from")||{},b=g("buyer","customer","to")||{};
+  m.seller={name:pick(s,["name","sellername","company"])||g("sellername"),trn:pick(s,["trn","vat","taxid","companyid"])||g("sellertrn"),country:pick(s,["country","countrycode"])||"AE",city:pick(s,["city","cityname"])};
+  m.buyer={name:pick(b,["name","buyername","company"])||g("buyername"),trn:pick(b,["trn","vat","taxid","companyid"])||g("buyertrn"),country:pick(b,["country","countrycode"])||"AE",city:pick(b,["city","cityname"])};
+  let lines=g("lines","items","lineitems");
+  if(Array.isArray(lines)){m.lines=lines.map(l=>({name:pick(l,["name","description","item","desc"]),qty:normNum(pick(l,["qty","quantity"]))||1,price:normNum(pick(l,["price","unitprice","priceamount"])),amount:normNum(pick(l,["amount","lineamount","lineextensionamount","total"])),vatCat:(pick(l,["vatcat","taxcategory","category","vatcategory"])||"S"),vatPct:normNum(pick(l,["vatpct","rate","percent","vatrate"])),exemptReason:pick(l,["exemptreason","exemptioncode"])}));}
+  if(!m.lines.length){const nm=g("item","description","product");if(nm)m.lines=[{name:nm,qty:normNum(g("qty","quantity"))||1,price:normNum(g("price","unitprice")),amount:normNum(g("amount","total")),vatCat:g("vatcat","category")||"S",vatPct:normNum(g("rate","percent"))}];}
+  return m;
+}
+function csvToModel(text){
+  const rows=text.replace(/\r/g,"").split("\n").filter(r=>r.trim().length);
+  if(!rows.length)return null;
+  const parseRow=r=>{const out=[];let cur="",q=false;for(let i=0;i<r.length;i++){const c=r[i];if(q){if(c==='"'){if(r[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}else{if(c===',')  {out.push(cur);cur="";}else if(c==='"')q=true;else cur+=c;}}out.push(cur);return out;};
+  const head=parseRow(rows[0]).map(h=>h.trim().toLowerCase().replace(/[^a-z0-9]/g,""));
+  const objs=rows.slice(1).map(r=>{const c=parseRow(r);const o={};head.forEach((h,i)=>o[h]=(c[i]||"").trim());return o;});
+  if(!objs.length)return null;
+  const first=objs[0];
+  const col=(o,keys)=>{for(const k of keys)if(o[k]!=null&&o[k]!=="")return o[k];return undefined;};
+  const m={
+    id:col(first,["invoiceno","invoicenumber","id","number"]),
+    issueDate:col(first,["issuedate","date","invoicedate"]),
+    dueDate:col(first,["duedate"]),
+    currency:col(first,["currency","currencycode"])||"AED",
+    typeCode:String(col(first,["typecode","invoicetypecode","type"])||"388"),
+    seller:{name:col(first,["sellername","seller","supplier"]),trn:col(first,["sellertrn","selllervat","suppliertrn"]),country:col(first,["sellercountry"])||"AE"},
+    buyer:{name:col(first,["buyername","buyer","customer"]),trn:col(first,["buyertrn","buyervat","customertrn"]),country:col(first,["buyercountry"])||"AE"},
+    lines:objs.map(o=>({name:col(o,["item","description","product","name","linename"]),qty:normNum(col(o,["qty","quantity"]))||1,price:normNum(col(o,["price","unitprice"])),amount:normNum(col(o,["amount","lineamount","total"])),vatCat:col(o,["vatcat","category","taxcategory","vatcategory"])||"S",vatPct:normNum(col(o,["vatpct","rate","percent","vatrate"])),exemptReason:col(o,["exemptreason","exemptioncode"])}))
+  };
+  return m;
+}
+function detectFormat(text){
+  const t=(text||"").trim();
+  if(/^<\?xml|^<[A-Za-z]/.test(t))return "xml";
+  if(/^[\[{]/.test(t)){try{JSON.parse(t);return "json";}catch(e){}}
+  if(t.includes(",")&&/\n/.test(t)&&/(invoice|item|qty|amount|price|seller|buyer|date)/i.test(t.split("\n")[0]))return "csv";
+  return "text";
+}
+
+/* ---- convert dispatcher: returns {xml, note, aiUsed} or throws ---- */
+async function convertToXML(text,fmtHint){
+  const fmt=fmtHint&&fmtHint!=="auto"?fmtHint:detectFormat(text);
+  if(fmt==="xml"){
+    const a=parsePintAe(text);
+    if(a.ok)return {xml:a.raw,note:"Recognised as a UBL invoice — normalised and ready.",aiUsed:false};
+    // structured XML but not UBL -> AI map
+    return await aiConvert(text,"This is an XML document that is NOT already a UBL PINT-AE invoice.");
+  }
+  if(fmt==="json"){const m=jsonToModel(JSON.parse(text));return {xml:buildUBL(m),note:"Mapped JSON fields into a PINT-AE invoice.",aiUsed:false};}
+  if(fmt==="csv"){const m=csvToModel(text);if(!m)throw new Error("Could not read the CSV.");return {xml:buildUBL(m),note:"Mapped CSV rows into a PINT-AE invoice (one row per line item).",aiUsed:false};}
+  return await aiConvert(text,"This is unstructured invoice text (e.g. copied from a PDF or email).");
+}
+async function aiConvert(content,hint){
+  const sys="You are a data-extraction engine. Read the supplied invoice content and output ONLY a compact JSON object (no prose, no markdown fences) with keys: id, issueDate (YYYY-MM-DD), dueDate, currency (3-letter), typeCode (\"388\" tax invoice, \"381\" credit note, \"480\" out-of-scope), seller{name,trn,country,city}, buyer{name,trn,country,city}, lines:[{name,qty,price,amount,vatCat(S/Z/E/AE/O/N),vatPct}]. Infer VAT category from context (default S at 5%). If a value is unknown, omit it. "+hint;
+  const resp=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:sys,messages:[{role:"user",content:content.slice(0,12000)}]})});
+  if(!resp.ok)throw new Error("The extraction service returned an error ("+resp.status+").");
+  const data=await resp.json();let out=(data.reply||"").trim().replace(/^```[a-z]*\s*|\s*```$/g,"");
+  const s=out.indexOf("{"),e=out.lastIndexOf("}");if(s<0||e<0)throw new Error("The extractor did not return usable data.");
+  let obj;try{obj=JSON.parse(out.slice(s,e+1));}catch(err){throw new Error("Could not parse the extracted data.");}
+  return {xml:buildUBL(jsonToModel(obj)),note:"AI-extracted from unstructured input — please review every field before use.",aiUsed:true};
+}
+
+/* ---- printable rendering ---- */
+function printableHTML(a){
+  const line=l=>`<tr><td>${esc(l.name||"")}</td><td style="text-align:right">${esc(l.qty||"")}</td><td style="text-align:right">${l.price!=null?fmt(l.price):""}</td><td style="text-align:center">${esc(l.vatCat||"")}${l.vatPct!==""&&l.vatPct!=null?" @"+esc(l.vatPct)+"%":""}</td><td style="text-align:right">${l.amount!=null?fmt(l.amount):""}</td></tr>`;
+  return `<!doctype html><meta charset="utf-8"><title>${esc(a.id||"invoice")}</title><body style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:800px;margin:32px auto;color:#0f172a;padding:0 20px">`+
+  `<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1 style="font-size:22px;margin:0">${esc(a.typeName||"Invoice")}</h1><div style="color:#64748b">${esc(a.id||"")}</div></div><div style="text-align:right;font-size:13px"><div>Issued: ${esc(a.issueDate||"—")}</div>${a.dueDate?`<div>Due: ${esc(a.dueDate)}</div>`:""}<div>Currency: ${esc(a.currency||"—")}</div></div></div><hr style="border:none;border-top:1px solid #e4e8f0;margin:16px 0">`+
+  `<div style="display:flex;gap:40px;font-size:13px"><div><b>Seller</b><br>${esc(a.seller.name||"—")}<br>TRN: ${esc(a.seller.trn||"—")}<br>${esc(a.seller.country||"")}</div><div><b>Buyer</b><br>${esc(a.buyer.name||"—")}<br>TRN: ${esc(a.buyer.trn||"—")}<br>${esc(a.buyer.country||"")}</div></div>`+
+  `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:18px"><thead><tr style="text-align:left;border-bottom:2px solid #e4e8f0"><th style="padding:6px">Item</th><th style="padding:6px;text-align:right">Qty</th><th style="padding:6px;text-align:right">Unit</th><th style="padding:6px;text-align:center">VAT</th><th style="padding:6px;text-align:right">Amount</th></tr></thead><tbody>${a.lines.map(line).join("")}</tbody></table>`+
+  `<div style="margin-top:16px;text-align:right;font-size:14px"><div>Net: ${fmt(a.totals.taxExcl)}</div><div>VAT: ${fmt(a.taxTotal)}</div><div style="font-weight:700;font-size:16px">Total: ${esc(a.currency||"")} ${fmt(a.totals.taxIncl)}</div></div>`+
+  `<p style="margin-top:24px;color:#94a3b8;font-size:11px">Generated by InvoiceFlow. This is a human-readable rendering of the structured PINT-AE XML, not a certified tax document.</p></body>`;
+}
+function printOut(html){const w=window.open("","_blank");if(!w){alert("Please allow pop-ups to print.");return;}w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),300);}
+function printInvoiceXML(xml){const a=parsePintAe(xml);if(a.ok)printOut(printableHTML(a));else printOut("<pre>"+esc(xml)+"</pre>");}
+
+/* ================= CONVERT TAB ================= */
+function renderConvert(){
+  return `<div class="card"><div class="toolbar"><span class="vh">Convert any invoice to PINT-AE XML</span></div>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 12px">Paste invoice content or choose a file. Structured inputs (existing <b>XML</b>, <b>JSON</b>, <b>CSV</b>) are converted directly in your browser; other formats (pasted text, PDF text) use the AI extractor and must be reviewed.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <button class="btn" id="cvFile">Choose file (.xml .json .csv .txt .pdf)</button>
+      <select id="cvFmt" style="padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px">
+        <option value="auto">Auto-detect format</option><option value="xml">XML (UBL)</option><option value="json">JSON</option><option value="csv">CSV</option><option value="text">Unstructured text (AI)</option></select>
+      <button class="btn" id="cvSampleCsv">Insert CSV example</button>
+      <button class="btn" id="cvSampleJson">Insert JSON example</button>
+      <input type="file" id="cvFileInput" accept=".xml,.json,.csv,.txt,.pdf,text/xml,application/xml,application/json,text/csv,text/plain,application/pdf" hidden />
+    </div>
+    <textarea id="cvIn" placeholder="Paste invoice XML, JSON, CSV, or plain text here…" style="width:100%;min-height:150px;font-family:var(--mono);font-size:12px;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical"></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="cvGo" style="background:var(--ai);color:#fff;border-color:var(--ai)">Convert to XML</button><span id="cvMsg" style="font-size:12.5px;color:var(--muted);align-self:center"></span></div>
+    <div id="cvOut" style="margin-top:14px"></div></div>`;
+}
+function wireConvert(){
+  const inEl=$("cvIn");
+  $("cvFile").onclick=()=>$("cvFileInput").click();
+  $("cvFileInput").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;
+    if(/\.pdf$/i.test(file.name)){$("cvMsg").textContent="Reading PDF text…";try{inEl.value=await pdfText(file);$("cvFmt").value="text";$("cvMsg").textContent="PDF text extracted — click Convert (uses AI).";}catch(err){$("cvMsg").textContent="Could not read PDF text: "+err.message;}return;}
+    const r=new FileReader();r.onload=()=>{inEl.value=r.result;$("cvMsg").textContent="Loaded "+file.name;};r.readAsText(file);});
+  $("cvSampleCsv").onclick=()=>{inEl.value="invoiceNo,issueDate,currency,sellerName,sellerTRN,buyerName,buyerTRN,item,qty,price,vatCat,vatPct\nINV-2026-501,2026-06-20,AED,AlNoor Trading LLC,100123456700003,Gulf Distributors FZE,100987654300003,Steel fittings,10,200,S,5\nINV-2026-501,2026-06-20,AED,AlNoor Trading LLC,100123456700003,Gulf Distributors FZE,100987654300003,Installation,5,200,S,5";$("cvFmt").value="csv";};
+  $("cvSampleJson").onclick=()=>{inEl.value=JSON.stringify({id:"INV-2026-777",issueDate:"2026-06-22",currency:"AED",typeCode:"388",seller:{name:"AlNoor Trading LLC",trn:"100123456700003"},buyer:{name:"Gulf Distributors FZE",trn:"100987654300003"},lines:[{name:"Consulting",qty:1,price:5000,vatCat:"S",vatPct:5}]},null,2);$("cvFmt").value="json";};
+  $("cvGo").onclick=async()=>{
+    const text=inEl.value.trim();if(!text){$("cvMsg").textContent="Paste or load something first.";return;}
+    $("cvMsg").textContent="Converting…";
+    try{
+      const {xml,note,aiUsed}=await convertToXML(text,$("cvFmt").value);
+      const a=parsePintAe(xml);const findings=a.ok?validate(a):[];const fatal=findings.filter(f=>f.sev==="fatal").length,warn=findings.filter(f=>f.sev==="warning").length;
+      $("cvMsg").textContent="";
+      $("cvOut").innerHTML=`${aiUsed?`<div class="finding warning" style="margin-bottom:10px"><div class="msg">${esc(note)}</div></div>`:`<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">${esc(note)}</div>`}
+        <div class="v-hero ${fatal?"fail":warn?"warn":"pass"}" style="margin-bottom:10px"><div class="ring">${ic(fatal?"x":warn?"alert":"check")}</div><div style="flex:1"><div class="vt">${fatal?"Converted, but would be rejected":warn?"Converted, with warnings":"Converted and passes built-in checks"}</div><div class="vs">${fatal+" fatal · "+warn+" warning — open in workspace to see details."}</div></div></div>
+        <textarea readonly style="width:100%;min-height:220px;font-family:var(--mono);font-size:11.5px;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)">${esc(xml)}</textarea>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="cvDl">${ic("download")} Download .xml</button>
+          <button class="btn" id="cvPrint">${ic("file")} Print / PDF</button>
+          <button class="btn" id="cvLoad" style="background:var(--ai);color:#fff;border-color:var(--ai)">Load into workspace</button></div>`;
+      const name=(a.ok&&a.id?a.id:"converted-invoice")+".xml";
+      $("cvDl").onclick=()=>download(xml,name);
+      $("cvPrint").onclick=()=>printInvoiceXML(xml);
+      $("cvLoad").onclick=()=>addSource(name,xml);
+    }catch(err){$("cvMsg").textContent="";$("cvOut").innerHTML=`<div class="finding fatal"><div class="msg">${esc(err.message||"Conversion failed.")}</div><div class="ex">${$("cvFmt").value==="text"||detectFormat(text)==="text"?"Unstructured extraction needs the AI assistant service to be configured and online. You can also paste structured XML, JSON, or CSV, which convert offline.":"Check the input format, or try a different format option."}</div></div>`;}
+  };
+}
+async function pdfText(file){
+  if(!window.pdfjsLib){await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=res;s.onerror=()=>rej(new Error("could not load PDF reader"));document.head.appendChild(s);});
+    if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}
+  const buf=await file.arrayBuffer();const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;let out="";
+  for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();out+=tc.items.map(t=>t.str).join(" ")+"\n";}
+  if(!out.trim())throw new Error("no selectable text (looks like a scanned image; OCR is not supported)");
+  return out;
+}
+
+/* ================= BUILD / REFERENCE TAB ================= */
+function requirements(type,txn,cat){
+  const R=[];const req=(bt,label,status,note)=>R.push({bt,label,status,note});
+  req("BT-1","Invoice number","mandatory","Unique document identifier.");
+  req("BT-2","Issue date","mandatory","YYYY-MM-DD.");
+  req("BT-3","Invoice type code","mandatory",KB.docTypes[type]?type+" — "+KB.docTypes[type]:type);
+  req("BT-5","Document currency","mandatory","3-letter ISO, e.g. AED.");
+  req("BT-27","Seller name","mandatory","");
+  req("BT-31","Seller TRN",cat==="S"||cat==="N"?"mandatory":"recommended","Required when charging VAT.");
+  req("BT-44","Buyer name","mandatory","");
+  req("BT-48","Buyer TRN",(cat==="AE"||type==="380"||type==="381")?"mandatory":"recommended",cat==="AE"?"Reverse charge (ibr-103-ae) requires it.":"Normally required for B2B.");
+  req("BT-118","VAT category code","mandatory","One of S, Z, E, AE, O, N.");
+  if(cat==="S")req("BT-119","VAT rate (5%)","mandatory","Standard-rated lines must state 5%.");
+  else if(cat==="Z")req("BT-119","VAT rate (0)","mandatory","Zero-rated must state an explicit 0 (ibr-120-ae).");
+  else if(cat==="E")req("BT-119","VAT rate","must be absent","Exempt lines must not carry a rate (ibr-121-ae).");
+  if(cat==="E"||cat==="AE")req("BTAE-09","Exemption reason","mandatory","Reason code expected for E/AE (e.g. VATEX-AE-…).");
+  req("BT-106/109/112","Monetary totals","mandatory","Net, tax-exclusive, and tax-inclusive must reconcile.");
+  const notes=[];
+  if(type==="480"||type==="81")notes.push("Out-of-scope document (ibr-122-ae): only categories E, O, or Z are permitted.");
+  if(type==="380"||type==="381")notes.push("Tax invoice (ibr-151-ae): at least one line must be a taxable category (not only E/O).");
+  const margin=txn&&txn.length>=3&&txn[2]==="1";
+  if(margin)notes.push("Margin scheme (ibr-116-ae): only category N is allowed, and N is allowed only here.");
+  if(cat==="N"&&!margin)notes.push("Category N requires the margin transaction type.");
+  if(cat==="AE")notes.push("Reverse charge: seller charges no VAT; buyer self-accounts.");
+  return {rows:R,notes};
+}
+function buildState(){return state._build||(state._build={type:"388",txn:"00000000",cat:"S",lines:[{name:"",qty:1,price:0,vatCat:"S",vatPct:5}]});}
+function renderBuild(){
+  const b=buildState();
+  const opt=(o,sel)=>Object.keys(o).map(k=>`<option value="${k}" ${k===sel?"selected":""}>${k} — ${esc(o[k])}</option>`).join("");
+  const catOpt=Object.keys(KB.taxCategories).map(k=>`<option value="${k}" ${k===b.cat?"selected":""}>${k} — ${esc(KB.taxCategories[k].name)}</option>`).join("");
+  const reqTbl=()=>{const {rows,notes}=requirements(b.type,b.txn,b.cat);
+    const badge=s=>`<span style="font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:9px;background:${s==="mandatory"?"#fee2e2":s==="must be absent"?"#e0e7ff":"#dcfce7"};color:${s==="mandatory"?"#b91c1c":s==="must be absent"?"#4338ca":"#166534"}">${esc(s)}</span>`;
+    return `<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)"><th style="padding:5px 6px">Term</th><th style="padding:5px 6px">Field</th><th style="padding:5px 6px">Requirement</th></tr></thead><tbody>${rows.map(r=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 6px;font-family:var(--mono);color:var(--ai)">${esc(r.bt)}</td><td style="padding:5px 6px">${esc(r.label)}${r.note?`<div style="color:var(--muted);font-size:11px">${esc(r.note)}</div>`:""}</td><td style="padding:5px 6px">${badge(r.status)}</td></tr>`).join("")}</tbody></table>${notes.length?`<div class="legend" style="margin-top:10px"><b>Combination rules for this selection:</b><ul style="margin:6px 0 0 16px">${notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>`:""}`;};
+  const lineRows=b.lines.map((l,i)=>`<tr data-li="${i}">
+    <td style="padding:3px"><input data-f="name" value="${esc(l.name||"")}" placeholder="Item / service" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td>
+    <td style="padding:3px"><input data-f="qty" value="${esc(l.qty)}" style="width:56px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td>
+    <td style="padding:3px"><input data-f="price" value="${esc(l.price)}" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td>
+    <td style="padding:3px"><select data-f="vatCat" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px">${Object.keys(KB.taxCategories).map(k=>`<option value="${k}" ${k===l.vatCat?"selected":""}>${k}</option>`).join("")}</select></td>
+    <td style="padding:3px"><input data-f="vatPct" value="${l.vatPct==null?"":esc(l.vatPct)}" style="width:52px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td>
+    <td style="padding:3px"><button class="btn" data-rm="${i}" title="Remove">${ic("x")}</button></td></tr>`).join("");
+  return `<div class="card"><div class="toolbar"><span class="vh">Build a compliant invoice</span></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <label style="font-size:12px;color:var(--muted)">Document type<br><select id="bType" style="margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px">${opt(KB.docTypes,b.type)}</select></label>
+      <label style="font-size:12px;color:var(--muted)">Transaction type<br><select id="bTxn" style="margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px">${opt(KB.txnTypes,b.txn)}</select></label>
+      <label style="font-size:12px;color:var(--muted)">Primary VAT category<br><select id="bCat" style="margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px">${catOpt}</select></label>
+    </div>
+    <div id="bReq">${reqTbl()}</div></div>
+    <div class="card"><div class="toolbar"><span class="vh">Invoice details</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px">
+        <label style="font-size:12px;color:var(--muted)">Invoice number<br><input id="bId" value="INV-2026-0001" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Issue date<br><input id="bDate" type="date" value="${today()}" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Currency<br><input id="bCur" value="AED" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Seller name<br><input id="bSName" value="AlNoor Trading LLC" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Seller TRN<br><input id="bSTrn" value="100123456700003" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Buyer name<br><input id="bBName" value="Gulf Distributors FZE" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+        <label style="font-size:12px;color:var(--muted)">Buyer TRN<br><input id="bBTrn" value="100987654300003" style="margin-top:3px;width:100%;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px"></label>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:var(--muted)"><th style="padding:3px 6px">Item</th><th style="padding:3px 6px">Qty</th><th style="padding:3px 6px">Unit price</th><th style="padding:3px 6px">VAT</th><th style="padding:3px 6px">Rate %</th><th></th></tr></thead><tbody id="bLines">${lineRows}</tbody></table>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bAddLine">+ Add line</button><button class="btn" id="bGen" style="background:var(--ai);color:#fff;border-color:var(--ai)">Generate XML</button></div>
+      <div id="bOut" style="margin-top:14px"></div></div>`;
+}
+function wireBuild(){
+  const b=buildState();
+  const upReq=()=>{$("bReq").innerHTML=(()=>{const t=$("bType").value,x=$("bTxn").value,c=$("bCat").value;b.type=t;b.txn=x;b.cat=c;
+    const {rows,notes}=requirements(t,x,c);const badge=s=>`<span style="font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:9px;background:${s==="mandatory"?"#fee2e2":s==="must be absent"?"#e0e7ff":"#dcfce7"};color:${s==="mandatory"?"#b91c1c":s==="must be absent"?"#4338ca":"#166534"}">${esc(s)}</span>`;
+    return `<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)"><th style="padding:5px 6px">Term</th><th style="padding:5px 6px">Field</th><th style="padding:5px 6px">Requirement</th></tr></thead><tbody>${rows.map(r=>`<tr style="border-bottom:1px solid var(--line)"><td style="padding:5px 6px;font-family:var(--mono);color:var(--ai)">${esc(r.bt)}</td><td style="padding:5px 6px">${esc(r.label)}${r.note?`<div style="color:var(--muted);font-size:11px">${esc(r.note)}</div>`:""}</td><td style="padding:5px 6px">${badge(r.status)}</td></tr>`).join("")}</tbody></table>${notes.length?`<div class="legend" style="margin-top:10px"><b>Combination rules for this selection:</b><ul style="margin:6px 0 0 16px">${notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>`:""}`;})();};
+  ["bType","bTxn","bCat"].forEach(id=>{const e=$(id);if(e)e.onchange=upReq;});
+  const readLines=()=>{const rows=[...document.querySelectorAll("#bLines tr")];b.lines=rows.map(tr=>{const g=f=>{const el=tr.querySelector(`[data-f="${f}"]`);return el?el.value:"";};return {name:g("name"),qty:normNum(g("qty"))||0,price:normNum(g("price"))||0,vatCat:g("vatCat")||"S",vatPct:g("vatPct")===""?null:normNum(g("vatPct"))};});};
+  const rewire=()=>{document.querySelectorAll("#bLines [data-rm]").forEach(btn=>btn.onclick=()=>{readLines();b.lines.splice(+btn.dataset.rm,1);if(!b.lines.length)b.lines=[{name:"",qty:1,price:0,vatCat:b.cat,vatPct:5}];$("canvasBody").querySelector("#bLines").innerHTML=lineRowsHTML(b);rewire();});};
+  const lineRowsHTML=(b)=>b.lines.map((l,i)=>`<tr data-li="${i}"><td style="padding:3px"><input data-f="name" value="${esc(l.name||"")}" placeholder="Item / service" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td><td style="padding:3px"><input data-f="qty" value="${esc(l.qty)}" style="width:56px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td><td style="padding:3px"><input data-f="price" value="${esc(l.price)}" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td><td style="padding:3px"><select data-f="vatCat" style="padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px">${Object.keys(KB.taxCategories).map(k=>`<option value="${k}" ${k===l.vatCat?"selected":""}>${k}</option>`).join("")}</select></td><td style="padding:3px"><input data-f="vatPct" value="${l.vatPct==null?"":esc(l.vatPct)}" style="width:52px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"></td><td style="padding:3px"><button class="btn" data-rm="${i}">${ic("x")}</button></td></tr>`).join("");
+  const addLine=$("bAddLine");if(addLine)addLine.onclick=()=>{readLines();b.lines.push({name:"",qty:1,price:0,vatCat:b.cat,vatPct:b.cat==="S"?5:b.cat==="Z"?0:null});$("bLines").innerHTML=lineRowsHTML(b);rewire();};
+  rewire();
+  const gen=$("bGen");if(gen)gen.onclick=()=>{readLines();
+    const m={id:$("bId").value,issueDate:$("bDate").value,currency:$("bCur").value,typeCode:b.type,profileExec:b.txn,seller:{name:$("bSName").value,trn:$("bSTrn").value,country:"AE"},buyer:{name:$("bBName").value,trn:$("bBTrn").value,country:"AE"},lines:b.lines};
+    const xml=buildUBL(m);const a=parsePintAe(xml);const findings=a.ok?validate(a):[];const fatal=findings.filter(f=>f.sev==="fatal").length,warn=findings.filter(f=>f.sev==="warning").length;
+    $("bOut").innerHTML=`<div class="v-hero ${fatal?"fail":warn?"warn":"pass"}" style="margin-bottom:10px"><div class="ring">${ic(fatal?"x":warn?"alert":"check")}</div><div style="flex:1"><div class="vt">${fatal?"Generated — has fatal issues":warn?"Generated — with warnings":"Generated — passes built-in checks"}</div><div class="vs">${fatal} fatal · ${warn} warning</div></div></div>
+      <textarea readonly style="width:100%;min-height:220px;font-family:var(--mono);font-size:11.5px;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)">${esc(xml)}</textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bDl">${ic("download")} Download .xml</button><button class="btn" id="bPrint">${ic("file")} Print / PDF</button><button class="btn" id="bLoad" style="background:var(--ai);color:#fff;border-color:var(--ai)">Load into workspace</button></div>`;
+    const nm=(m.id||"invoice")+".xml";
+    $("bDl").onclick=()=>download(xml,nm);$("bPrint").onclick=()=>printInvoiceXML(xml);$("bLoad").onclick=()=>addSource(nm,xml);};
+}
+
+/* ================= BATCH TAB ================= */
+function renderBatch(){
+  const srcs=state.sources;
+  if(!srcs.length)return `<div class="card"><div class="toolbar"><span class="vh">Batch validation</span></div><p style="color:var(--muted);font-size:13px">Load two or more invoices (left panel, or the Convert/Build tabs) to validate them together and export a combined report.</p></div>`;
+  const rows=srcs.map(s=>{const ok=s.analysis.ok;const f=(s.findings||[]);const fatal=f.filter(x=>x.sev==="fatal").length,warn=f.filter(x=>x.sev==="warning").length;
+    const verdict=!ok?"Unreadable":fatal?"Would be rejected":warn?"Valid, warnings":"Passes checks";const col=!ok||fatal?"var(--fail)":warn?"var(--warn)":"var(--pass)";
+    return `<tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 6px"><b>${esc(s.name)}</b></td><td style="padding:7px 6px;color:var(--muted)">${ok?esc(s.analysis.typeName):"—"}</td><td style="padding:7px 6px;color:${col};font-weight:600">${verdict}</td><td style="padding:7px 6px;text-align:center">${fatal}</td><td style="padding:7px 6px;text-align:center">${warn}</td></tr>`;}).join("");
+  const tot=srcs.reduce((o,s)=>{const f=s.findings||[];o.fatal+=f.filter(x=>x.sev==="fatal").length;o.warn+=f.filter(x=>x.sev==="warning").length;o.clean+=(s.analysis.ok&&!f.some(x=>x.sev==="fatal"||x.sev==="warning"))?1:0;return o;},{fatal:0,warn:0,clean:0});
+  return `<div class="card"><div class="toolbar"><span class="vh">Batch validation — ${srcs.length} invoice${srcs.length>1?"s":""}</span><div class="tb-actions"><button class="btn" id="btJson">${ic("download")} JSON</button><button class="btn" id="btCsv">${ic("download")} CSV</button><button class="btn" id="btRun">${ic("play")} Run all scenarios</button></div></div>
+    <div style="display:flex;gap:16px;margin-bottom:12px;font-size:13px"><span style="color:var(--pass)"><b>${tot.clean}</b> clean</span><span style="color:var(--warn)"><b>${tot.warn}</b> warnings</span><span style="color:var(--fail)"><b>${tot.fatal}</b> fatal</span></div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)"><th style="padding:6px">Invoice</th><th style="padding:6px">Type</th><th style="padding:6px">Verdict</th><th style="padding:6px;text-align:center">Fatal</th><th style="padding:6px;text-align:center">Warn</th></tr></thead><tbody>${rows}</tbody></table>
+    <div id="btRunOut" style="margin-top:14px"></div>
+    <div class="legend" style="margin-top:12px"><b>Heuristic checks.</b> Combined view of every loaded invoice. Use the engine toggle on the Validation tab to grade against a backend schematron instead.</div></div>`;
+}
+function wireBatch(){
+  const j=$("btJson");if(j)j.onclick=()=>{const out=state.sources.map(s=>({invoice:s.name,type:s.analysis.ok?s.analysis.typeName:null,readable:s.analysis.ok,findings:(s.findings||[]).map(f=>({rule:f.id,severity:f.sev,term:f.term,message:f.msg}))}));dl(JSON.stringify(out,null,2),"invoiceflow-batch-validation.json","application/json");};
+  const c=$("btCsv");if(c)c.onclick=()=>{const rows=[["invoice","type","rule","severity","term","message"]];state.sources.forEach(s=>{(s.findings||[]).forEach(f=>rows.push([s.name,s.analysis.ok?s.analysis.typeName:"",f.id,f.sev,f.term,f.msg]));});dl(toCSV(rows),"invoiceflow-batch-validation.csv","text/csv");};
+  const r=$("btRun");if(r)r.onclick=()=>{runBatch();const s=$("labSum");$("btRunOut").innerHTML=s?s.outerHTML:"";};
+}
+
+/* ================= AUTO-FIX ================= */
+function autoFix(src){
+  let xml=src.raw;const fixed=[];
+  const edit=(fn,label)=>{const before=xml;xml=mut(xml,fn);if(xml!==before)fixed.push(label);};
+  const has=id=>(src.findings||[]).some(f=>f.id===id);
+  if(has("AE-CUR-01"))edit(d=>{if(!child(d.documentElement,"DocumentCurrencyCode")){const e=el(d,"cbc:DocumentCurrencyCode","AED");const anchor=child(d.documentElement,"InvoiceTypeCode")||child(d.documentElement,"IssueDate");if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(e,anchor.nextSibling);else d.documentElement.appendChild(e);}},"Added currency (AED)");
+  if(has("AE-DATE-01"))edit(d=>{if(!child(d.documentElement,"IssueDate")){const e=el(d,"cbc:IssueDate",today());const anchor=child(d.documentElement,"ID");if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(e,anchor.nextSibling);else d.documentElement.appendChild(e);}},"Added issue date (today)");
+  if(has("AE-CUR-02"))edit(d=>{const e=child(d.documentElement,"DocumentCurrencyCode");if(e)e.textContent="AED";},"Reset currency to AED");
+  if(has("AE-VAT-RATE-01"))edit(d=>{findAll(d.documentElement,"TaxCategory").forEach(c=>{if(txt(child(c,"ID"))==="S"&&!child(c,"Percent")){const p=el(d,"cbc:Percent","5");const id=child(c,"ID");c.insertBefore(p,id.nextSibling);}});},"Set 5% on standard-rated subtotals");
+  if(has("ibr-120-ae"))edit(d=>{findAll(d.documentElement,"TaxCategory").forEach(c=>{if(txt(child(c,"ID"))==="Z"){let p=child(c,"Percent");if(!p){p=el(d,"cbc:Percent","0");c.insertBefore(p,child(c,"ID").nextSibling);}else p.textContent="0";}});},"Set 0 rate on zero-rated subtotals");
+  if(has("ibr-121-ae"))edit(d=>{findAll(d.documentElement,"TaxCategory").forEach(c=>{if(txt(child(c,"ID"))==="E"){const p=child(c,"Percent");if(p)p.remove();}});},"Removed rate from exempt subtotals");
+  if(has("AE-EXEMPT-01"))edit(d=>{findAll(d.documentElement,"TaxCategory").forEach(c=>{const id=txt(child(c,"ID"));if(id==="E"&&!child(c,"TaxExemptionReasonCode")&&!child(c,"TaxExemptionReason")){const r=el(d,"cbc:TaxExemptionReasonCode","VATEX-AE-OOS");const sc=child(c,"TaxScheme");c.insertBefore(r,sc||null);}});},"Added placeholder exemption reason");
+  if(has("AE-ALLOW-DUP-01"))edit(d=>{findAll(d.documentElement,"AllowanceCharge").forEach(ac=>{const rs=children(ac,"AllowanceChargeReason");rs.slice(1).forEach(n=>n.remove());});},"De-duplicated allowance reasons");
+  if(has("AE-MATH-01"))edit(d=>{const l=child(d.documentElement,"LegalMonetaryTotal");const tt=child(d.documentElement,"TaxTotal");const excl=num(txt(child(l,"TaxExclusiveAmount")));const vat=num(txt(child(tt,"TaxAmount")));if(excl!=null&&vat!=null){const ti=child(l,"TaxInclusiveAmount");const pv=(excl+vat).toFixed(2);if(ti)ti.textContent=pv;const pa=child(l,"PayableAmount");if(pa)pa.textContent=pv;}},"Recomputed tax-inclusive total");
+  return {xml,fixed};
+}
+
+/* ================= BACKEND ENGINE ================= */
+async function _saveBackend(){try{localStorage.setItem("invoiceflow.backend",state.backendUrl||"");}catch(e){}}
+async function reValidateBackend(src){
+  const url=(state.backendUrl||"").replace(/\/+$/,"");
+  if(!url)throw new Error("Set the backend URL first.");
+  const resp=await fetch(url+"/validate",{method:"POST",headers:{"Content-Type":"application/xml"},body:src.raw});
+  if(!resp.ok)throw new Error("Backend returned "+resp.status);
+  const data=await resp.json();
+  const list=(data.findings||data.results||data||[]);
+  src.findings=(Array.isArray(list)?list:[]).map(f=>({id:f.rule||f.id||"rule",sev:(f.severity||f.sev||"warning").toLowerCase(),term:f.term||"—",msg:f.message||f.msg||"",ex:f.explain||"",fix:f.fix||""}));
+  if(!src.findings.length)src.findings=[{id:"OK",sev:"info",term:"—",msg:"Backend reported no issues.",ex:"",fix:""}];
+  src.engine="backend";
+}
+
+/* ---- validation tab extras: auto-fix + engine toggle (injected after renderValidation) ---- */
+function wireValidationExtras(src){
+  const body=$("canvasBody");if(!body)return;
+  const bar=document.createElement("div");bar.className="card";bar.style.cssText="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px";
+  bar.innerHTML=`<button class="btn" id="vFix">${ic("check")} Auto-fix issues</button>
+    <span style="width:1px;height:20px;background:var(--line)"></span>
+    <label style="font-size:12px;color:var(--muted)">Engine
+      <select id="vEngine" style="margin-left:5px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"><option value="builtin">Built-in (heuristic)</option><option value="backend">Backend (schematron)</option></select></label>
+    <input id="vBackendUrl" placeholder="https://your-backend" value="${esc(state.backendUrl||"")}" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px">
+    <button class="btn" id="vReval">Re-validate</button><span id="vEngMsg" style="font-size:12px;color:var(--muted)"></span>`;
+  body.insertBefore(bar,body.firstChild);
+  $("vFix").onclick=()=>{const {xml,fixed}=autoFix(src);if(!fixed.length){$("vEngMsg").textContent="Nothing could be auto-fixed — remaining issues need manual edits.";return;}addSource(src.name.replace(/\.xml$/i,"")+" (fixed).xml",xml);};
+  $("vEngine").value=src.engine==="backend"?"backend":"builtin";
+  $("vReval").onclick=async()=>{state.backendUrl=$("vBackendUrl").value.trim();_saveBackend();
+    if($("vEngine").value==="builtin"){src.findings=validate(src.analysis);src.engine="builtin";render();return;}
+    $("vEngMsg").textContent="Contacting backend…";try{await reValidateBackend(src);$("vEngMsg").textContent="Graded by backend schematron.";render();}catch(e){$("vEngMsg").textContent="Backend error: "+e.message+" (still showing built-in results).";}};
+}
+
+
+
+/* ---- merged Test Lab (validation + scenarios) ---- */
+function renderTestLab(a){
+  return renderValidation(a.analysis,a.findings)
+    +'<div id="valTools"></div>'
+    +'<div class="sec-title"><span>Test scenarios</span><span class="sec-sub">Inject one fault at a time and confirm the validator catches it</span></div>'
+    +renderLab(a);
+}
+function wireTestLab(a){
+  const j=$("vJson");if(j)j.onclick=()=>exportFindingsJSON(a);
+  const c=$("vCsv");if(c)c.onclick=()=>exportFindingsCSV(a);
+  const r=$("vReport");if(r)r.onclick=()=>exportReportHTML(a);
+  mountValidationTools(a);
+  wireLab(a);
+}
+function mountValidationTools(src){
+  const host=$("valTools");if(!host)return;
+  const bar=document.createElement("div");bar.className="tools-bar";
+  bar.innerHTML=`<button class="btn" id="vFix">${ic("check")} Auto-fix issues</button>
+    <span class="tab-div"></span>
+    <label style="font-size:12px;color:var(--muted)">Engine
+      <select id="vEngine" style="margin-left:5px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px"><option value="builtin">Built-in (heuristic)</option><option value="backend">Backend (schematron)</option></select></label>
+    <input id="vBackendUrl" placeholder="https://your-backend" value="${esc(state.backendUrl||"")}" style="flex:1;min-width:150px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;font-size:12px">
+    <button class="btn" id="vReval">Re-validate</button><span id="vEngMsg" style="font-size:12px;color:var(--muted)"></span>`;
+  host.appendChild(bar);
+  $("vFix").onclick=()=>{const {xml,fixed}=autoFix(src);if(!fixed.length){$("vEngMsg").textContent="Nothing could be auto-fixed — remaining issues need manual edits.";return;}addSource(src.name.replace(/\.xml$/i,"")+" (fixed).xml",xml);};
+  $("vEngine").value=src.engine==="backend"?"backend":"builtin";
+  $("vReval").onclick=async()=>{state.backendUrl=$("vBackendUrl").value.trim();_saveBackend();
+    if($("vEngine").value==="builtin"){src.findings=validate(src.analysis);src.engine="builtin";render();return;}
+    $("vEngMsg").textContent="Contacting backend…";try{await reValidateBackend(src);$("vEngMsg").textContent="Graded by backend schematron.";render();}catch(e){$("vEngMsg").textContent="Backend error: "+e.message+" (showing built-in results).";}};
+}
 
 /* ---- boot ---- */
 function welcome(){const chat=$("chat");const d=document.createElement("div");d.className="msg bot";
