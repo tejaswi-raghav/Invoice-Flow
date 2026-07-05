@@ -366,13 +366,19 @@
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   @media print{
     body{background:#fff}
-    .topbar,.col.sources,.col.agent,.tabs,.view-bar{display:none!important}
+    .topbar,.col.sources,.col.agent,.tabs,.subtabs,.view-bar{display:none!important}
     .app{display:block;height:auto}.col.canvas{overflow:visible}.col-body{overflow:visible;padding:0}
     .inv-doc{box-shadow:none;border:none;max-width:100%;margin:0;padding:0}
     table.inv-lines thead th,.inv-totbox .grand{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
   /* ---- information-architecture + form polish ---- */
   .tab-div{width:1px;height:20px;background:var(--line);align-self:center;margin:0 8px;flex:0 0 auto}
+  .subtabs{display:flex;gap:7px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .subtab{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:12.5px;font-weight:600;transition:.12s;cursor:pointer}
+  .subtab:hover{color:var(--ink);border-color:var(--muted)}
+  .subtab.active{background:var(--ai-soft);color:var(--ai);border-color:var(--ai)}
+  .subtab .count{font-family:var(--mono);font-size:10px;background:var(--chip);color:var(--muted);padding:1px 6px;border-radius:9px;margin-left:5px}
+  .subtab.active .count{background:var(--ai);color:#fff}
   .tabs{overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
   .dz-sub{font-size:11px;color:var(--c-faint);margin-top:4px}
@@ -421,15 +427,11 @@
 
     <main class="col canvas">
       <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="view">View</button>
-        <button class="tab" data-tab="details">Details</button>
-        <button class="tab" data-tab="lab">Test Lab <span class="count" id="cntLab">0</span></button>
-        <button class="tab" data-tab="compare">Compare</button>
-        <span class="tab-div"></span>
-        <button class="tab" data-tab="build">Build</button>
-        <button class="tab" data-tab="convert">Convert</button>
-        <button class="tab" data-tab="batch">Batch</button>
+        <button class="tab active" data-section="invoice">Invoice</button>
+        <button class="tab" data-section="inspect">Inspect &amp; Test</button>
+        <button class="tab" data-section="data">Compare &amp; Batch</button>
       </div>
+      <div class="subtabs" id="subtabs"></div>
       <div class="col-body" id="canvasBody"></div>
     </main>
 
@@ -500,7 +502,7 @@ const RULE_KB={
   "AE-EXEMPT-01":"Exempt (E) lines require an exemption reason code (e.g. DL8.46.x)."
 };
 
-const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
+const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,sectionLeaf:{invoice:"view",inspect:"details",data:"compare"},backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
 let idSeq=1;
 
 /* ---- XML helpers ---- */
@@ -656,12 +658,28 @@ function renderSources(){
 }
 function totalFindings(){return state.sources.reduce((s,x)=>s+((x.findings||[]).filter(f=>f.sev!=="info").length),0);}
 
+const SECTIONS=[
+  {id:"invoice",label:"Invoice",subs:[["view","View"],["convert","Convert"],["build","Build"]]},
+  {id:"inspect",label:"Inspect & Test",subs:[["details","Details"],["lab","Test Lab"]]},
+  {id:"data",label:"Compare & Batch",subs:[["compare","Compare"],["batch","Batch"]]},
+];
+function sectionOf(leaf){const s=SECTIONS.find(x=>x.subs.some(y=>y[0]===leaf));return s?s.id:"invoice";}
+function renderSubnav(){
+  const bar=$("subtabs");if(!bar)return;
+  const secId=sectionOf(state.tab);const section=SECTIONS.find(s=>s.id===secId);
+  const a=active();const issues=a&&a.analysis.ok?((a.findings||[]).filter(f=>f.sev!=="info").length):0;
+  bar.innerHTML=section.subs.map(([leaf,label])=>{
+    const badge=(leaf==="lab"&&a&&a.analysis.ok)?` <span class="count">${issues}</span>`:"";
+    return `<button class="subtab ${leaf===state.tab?"active":""}" data-leaf="${leaf}">${label}${badge}</button>`;
+  }).join("");
+  bar.querySelectorAll(".subtab").forEach(b=>b.onclick=()=>{state.tab=b.dataset.leaf;state.sectionLeaf[secId]=state.tab;render();persist();});
+}
 function render(){
   renderSources();const a=active();
   if(state.tab==="validation")state.tab="lab";
   const _cv=$("cntVal");if(_cv)_cv.textContent="";
-  $("cntLab").textContent=a&&a.analysis.ok?((a.findings||[]).filter(f=>f.sev!=="info").length):0;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===state.tab));
+  const _sec=sectionOf(state.tab);document.querySelectorAll("#tabs .tab").forEach(t=>t.classList.toggle("active",t.dataset.section===_sec));
+  renderSubnav();
   const body=$("canvasBody");
   if(state.tab==="compare"){body.innerHTML=renderCompare();wireCompare();return;}
   if(state.tab==="build"){body.innerHTML=renderBuild();wireBuild();return;}
@@ -902,7 +920,7 @@ const dz=$("dropzone");
 ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
 dz.addEventListener("drop",e=>{if(e.dataTransfer.files.length)readFiles(e.dataTransfer.files);});
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{state.tab=t.dataset.tab;render();persist();});
+document.querySelectorAll("#tabs .tab").forEach(t=>t.onclick=()=>{const sec=t.dataset.section;if(!state.sectionLeaf)state.sectionLeaf={invoice:"view",inspect:"details",data:"compare"};const def=SECTIONS.find(s=>s.id===sec).subs[0][0];state.tab=state.sectionLeaf[sec]||def;render();persist();});
 $("tglSources").onclick=()=>$("colSources").classList.toggle("hide");
 $("tglAgent").onclick=()=>$("colAgent").classList.toggle("hide");
 if(window.innerWidth<=1100){$("colSources").classList.add("hide");$("colAgent").classList.add("hide");}
