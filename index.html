@@ -373,11 +373,17 @@
   }
   /* ---- information-architecture + form polish ---- */
   .tab-div{width:1px;height:20px;background:var(--line);align-self:center;margin:0 8px;flex:0 0 auto}
-  .subtabs{display:flex;gap:7px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
-  .subtab{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:12.5px;font-weight:600;transition:.12s;cursor:pointer}
-  .subtab:hover{color:var(--ink);border-color:var(--muted)}
+  .subtabs{display:flex;gap:6px;padding:8px 16px;background:linear-gradient(180deg,var(--panel),var(--c-bg));border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .ribgrp{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-right:10px;padding-right:12px;border-right:1px solid var(--line);align-self:stretch;display:flex;align-items:center}
+  .subtab{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:600;transition:.12s;cursor:pointer}
+  .subtab .si{display:inline-flex;width:15px;height:15px;opacity:.85}
+  .subtab .si svg{width:15px;height:15px}
+  .subtab:hover{color:var(--ink);border-color:var(--muted);background:var(--panel-2,var(--panel))}
   .subtab.active{background:var(--ai-soft);color:var(--ai);border-color:var(--ai)}
-  .subtab .count{font-family:var(--mono);font-size:10px;background:var(--chip);color:var(--muted);padding:1px 6px;border-radius:9px;margin-left:5px}
+  .subtab.active .si{opacity:1}
+  .subtab .count{font-family:var(--mono);font-size:10px;background:var(--chip);color:var(--muted);padding:1px 6px;border-radius:9px;margin-left:2px}
+  .subtab .count.bad{background:#fee2e2;color:#b91c1c}
+  .subtab .count.ok{background:#dcfce7;color:#166534}
   .subtab.active .count{background:var(--ai);color:#fff}
   .tabs{overflow-x:auto;scrollbar-width:none}
   .tabs::-webkit-scrollbar{display:none}
@@ -397,7 +403,7 @@
     <button class="icon-btn" id="tglSources" aria-label="Toggle sources"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div class="brand">
       <span class="logo"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h11"/><path d="M5 12h8"/><path d="M5 17h11"/><path d="M16 9l3 3-3 3"/></svg></span>
-      <div><h1>InvoiceFlow</h1><div class="sub">PINT-AE invoice workspace</div></div>
+      <div><h1>InvoiceFlow</h1><div class="sub">PINT-AE invoice workbench</div></div>
     </div>
     <div class="spacer"></div>
     <div class="pill hide-sm privacy" title="Invoices are parsed, validated, and tested entirely in your browser. Only chat messages are sent to the assistant service."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private</div>
@@ -429,7 +435,7 @@
       <div class="tabs" id="tabs">
         <button class="tab active" data-section="invoice">Invoice</button>
         <button class="tab" data-section="inspect">Inspect &amp; Test</button>
-        <button class="tab" data-section="data">Compare &amp; Batch</button>
+        <button class="tab" data-section="tools">Tools</button>
       </div>
       <div class="subtabs" id="subtabs"></div>
       <div class="col-body" id="canvasBody"></div>
@@ -502,7 +508,7 @@ const RULE_KB={
   "AE-EXEMPT-01":"Exempt (E) lines require an exemption reason code (e.g. DL8.46.x)."
 };
 
-const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,sectionLeaf:{invoice:"view",inspect:"details",data:"compare"},backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
+const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,sectionLeaf:{invoice:"view",inspect:"validation",tools:"convert"},backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
 let idSeq=1;
 
 /* ---- XML helpers ---- */
@@ -659,24 +665,27 @@ function renderSources(){
 function totalFindings(){return state.sources.reduce((s,x)=>s+((x.findings||[]).filter(f=>f.sev!=="info").length),0);}
 
 const SECTIONS=[
-  {id:"invoice",label:"Invoice",subs:[["view","View"],["convert","Convert"],["build","Build"]]},
-  {id:"inspect",label:"Inspect & Test",subs:[["details","Details"],["lab","Test Lab"]]},
-  {id:"data",label:"Compare & Batch",subs:[["compare","Compare"],["batch","Batch"]]},
+  {id:"invoice",label:"Invoice",icon:"file",subs:[["view","View","file"],["details","Details","info"]]},
+  {id:"inspect",label:"Inspect & Test",icon:"check",subs:[["validation","Validation","check"],["lab","Test Scenarios","play"]]},
+  {id:"tools",label:"Tools",icon:"plus",subs:[["convert","Convert","arrow"],["build","Build","plus"],["compare","Compare","diff"],["batch","Batch","Structure"]]},
 ];
 function sectionOf(leaf){const s=SECTIONS.find(x=>x.subs.some(y=>y[0]===leaf));return s?s.id:"invoice";}
 function renderSubnav(){
   const bar=$("subtabs");if(!bar)return;
   const secId=sectionOf(state.tab);const section=SECTIONS.find(s=>s.id===secId);
   const a=active();const issues=a&&a.analysis.ok?((a.findings||[]).filter(f=>f.sev!=="info").length):0;
-  bar.innerHTML=section.subs.map(([leaf,label])=>{
-    const badge=(leaf==="lab"&&a&&a.analysis.ok)?` <span class="count">${issues}</span>`:"";
-    return `<button class="subtab ${leaf===state.tab?"active":""}" data-leaf="${leaf}">${label}${badge}</button>`;
+  const nscen=a&&a.analysis.ok?(a.scenarios||[]).length:0;
+  const tools=section.subs.map(([leaf,label,icon])=>{
+    let badge="";
+    if(leaf==="validation"&&a&&a.analysis.ok)badge=` <span class="count ${issues?"bad":"ok"}">${issues}</span>`;
+    if(leaf==="lab"&&nscen)badge=` <span class="count">${nscen}</span>`;
+    return `<button class="subtab ${leaf===state.tab?"active":""}" data-leaf="${leaf}" title="${esc(label)}"><span class="si">${ic(icon||"dot")}</span><span>${label}</span>${badge}</button>`;
   }).join("");
+  bar.innerHTML=`<span class="ribgrp">${esc(section.label)}</span>${tools}`;
   bar.querySelectorAll(".subtab").forEach(b=>b.onclick=()=>{state.tab=b.dataset.leaf;state.sectionLeaf[secId]=state.tab;render();persist();});
 }
 function render(){
   renderSources();const a=active();
-  if(state.tab==="validation")state.tab="lab";
   const _cv=$("cntVal");if(_cv)_cv.textContent="";
   const _sec=sectionOf(state.tab);document.querySelectorAll("#tabs .tab").forEach(t=>t.classList.toggle("active",t.dataset.section===_sec));
   renderSubnav();
@@ -689,7 +698,8 @@ function render(){
   if(!a.analysis.ok){body.innerHTML=`<div class="card"><h4>Cannot read file</h4><div class="finding fatal"><div class="msg">${esc(a.analysis.error)}</div><div class="ex">InvoiceFlow expects a UBL Invoice or CreditNote in PINT-AE form.</div></div></div>`;return;}
   if(state.tab==="view"){body.innerHTML=renderInvoiceView(a.analysis);const pb=$("printBtn");if(pb)pb.onclick=()=>window.print();}
   else if(state.tab==="details"){body.innerHTML=renderDetails(a.analysis);const j=$("expJson");if(j)j.onclick=()=>exportDecodedJSON(a.analysis);const c=$("expCsv");if(c)c.onclick=()=>exportLinesCSV(a.analysis);}
-  else{body.innerHTML=renderTestLab(a);wireTestLab(a);}
+  else if(state.tab==="validation"){body.innerHTML=renderValidation(a.analysis,a.findings)+'<div id="valTools"></div>';wireValidationTab(a);}
+  else{body.innerHTML=renderLab(a);wireLab(a);}
 }
 function emptyNode(){const d=document.createElement("div");d.className="empty";
   d.innerHTML=`<svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
@@ -1398,6 +1408,12 @@ function wireValidationExtras(src){
 
 
 /* ---- merged Test Lab (validation + scenarios) ---- */
+function wireValidationTab(a){
+  const j=$("vJson");if(j)j.onclick=()=>exportFindingsJSON(a);
+  const c=$("vCsv");if(c)c.onclick=()=>exportFindingsCSV(a);
+  const r=$("vReport");if(r)r.onclick=()=>exportReportHTML(a);
+  mountValidationTools(a);
+}
 function renderTestLab(a){
   return renderValidation(a.analysis,a.findings)
     +'<div id="valTools"></div>'

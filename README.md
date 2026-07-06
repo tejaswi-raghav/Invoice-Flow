@@ -105,18 +105,41 @@ invoiceflow-backend/          # BACKEND — deploy on a container host
 
 ## Part 1 — Frontend web app
 
-### Features
+### Layout — a ribbon workbench
 
-| Surface | What it does |
+The UI is organised like a CAD workbench: a top **ribbon** of three sections, each
+opening a **toolbar row** of sub-tools beneath it. Each section remembers the last
+tool you used. Invoices are managed in the left rail (drop / browse / samples), the
+open invoice fills the canvas, and the grounded **Assistant** sits on the right.
+
+**1 · Invoice** — get an invoice in and read it.
+
+| Tool | What it does |
 |---|---|
 | **View** | Renders the XML as a clean, printable invoice (Print / Save as PDF). |
-| **Details** | Decoded data with each field tagged by its business-term code (BT-1, BT-110…): parties, **transaction type** (BTAE-02), VAT breakdown, totals, line items. Export decoded JSON or lines CSV. |
-| **Validation** | Verdict (accepted / warnings / rejected) with a status ring and a pass·warning·fatal meter; each issue shows severity, rule ID, explanation, and fix. Includes **combination/category rules** (e.g. `ibr-122-ae`, `ibr-151-ae`, `ibr-116-ae`, `ibr-103-ae`, `ibr-120/121-ae`) covering document-type × transaction-type × VAT-category constraints. Download an HTML report or export findings as JSON/CSV. |
-| **Test Lab** | ~23 scenarios that each inject one fault, grouped by category (Identity, Temporal, Parties, Tax, Currency, Totals, Structure, **Combinations**, Baseline), with a results donut, a *valid → fault → rule fires* flow, live pass/fail icons, rule coverage, a before→after XML diff, batch runs across all invoices, and JSON / JUnit export. |
-| **Compare** | Two invoices side by side — parties, totals (with deltas), tax categories, and which validation issues each raises. |
-| **Assistant** | Grounded in the open invoice; answers questions **and** operates the app (open tabs, generate/run tests, add variants, load samples), showing what it did inline. |
+| **Details** | Decoded data with each field tagged by its business-term code (BT-1, BT-110…) per the schematron: parties, **transaction type** (BTAE-02), VAT breakdown, totals, line items. Export decoded JSON or lines CSV. |
 
-The workspace (invoices, active tab, chat) is **saved in the browser** and restored
+**2 · Inspect & Test** — check the invoice and prove the checks.
+
+| Tool | What it does |
+|---|---|
+| **Validation** | Verdict (accepted / warnings / rejected) with a status ring and a pass·warning·fatal meter; each issue shows severity, rule ID, explanation, and fix. Includes **combination/category rules** (e.g. `ibr-122-ae`, `ibr-151-ae`, `ibr-116-ae`, `ibr-103-ae`, `ibr-120/121-ae`) covering document-type × transaction-type × VAT-category constraints. **Auto-fix** applies safe corrections; an **engine toggle** switches between the built-in heuristics and a backend schematron. Download an HTML report or export findings as JSON/CSV. |
+| **Test Scenarios** | ~23 scenarios that each inject one fault, grouped by category (Identity, Temporal, Parties, Tax, Currency, Totals, Structure, **Combinations**, Baseline), with a results donut, a *valid → fault → rule fires* flow, live pass/fail icons, rule coverage, a before→after XML diff, batch runs across all invoices, and JSON / JUnit export. |
+
+**3 · Tools** — creation, conversion, and multi-invoice work.
+
+| Tool | What it does |
+|---|---|
+| **Convert** | Turns any uploaded invoice into downloadable PINT-AE XML. Existing **XML**, **JSON**, and **CSV** convert deterministically in the browser; pasted text / PDF text is extracted with the AI assistant (flagged for review). Download the XML, print a readable copy, or load it into the workspace. |
+| **Build** | Author a compliant invoice from a form: pick document type, transaction type, and VAT category, see the required/conditional fields with their BT codes and the applicable combination rules, then generate valid UBL to download, print, or load in. |
+| **Compare** | Two invoices side by side — parties, totals (with deltas), tax categories, and which validation issues each raises. |
+| **Batch** | Every loaded invoice in one pass/fail table with fatal/warning counts, combined JSON/CSV export, and a run-all-scenarios sweep. |
+
+The grounded **Assistant** is available throughout: it answers questions about the
+open invoice **and** operates the workbench (open tools, generate/run tests, add
+variants, load samples), showing what it did inline.
+
+The workspace (invoices, active tool, chat) is **saved in the browser** and restored
 on return; a **Clear workspace** button wipes it. A **Private** badge reflects that
 everything but chat stays local.
 
@@ -214,7 +237,7 @@ docker run -p 8000:8000 invoiceflow-backend
 
 By default the frontend is fully standalone — it never needs the test-runner. If
 you want runs centralized (one source of truth, batch over many invoices, or
-certified-schematron grading), point the Test Lab at the backend's `/test` and
+certified-schematron grading), point the Inspect & Test tools (Validation / Test Scenarios) at the backend's `/validate` and `/test`, and
 render the returned `results`:
 
 ```js
@@ -273,7 +296,7 @@ the backend can flip to the certified validator.
 
 ## Roadmap
 
-- Wire the frontend Test Lab to optionally run on the backend.
+- Wire the frontend Validation / Test Scenarios tools to optionally run on the backend.
 - Ship and document the certified PINT-AE schematron ruleset for the backend's
   Saxon path.
 - Custom-scenario builder (pick a field, choose an operation, declare the rule).
