@@ -76,33 +76,40 @@ optional service for automation and certified validation.
 
 ## Repository structure
 
-This is a **monorepo** — both parts live in this one repository, on `main`. Each
-half deploys independently (different hosts, different lifecycles), so each has
-its own deploy config rooted at its own subfolder; see the two Deploy sections
-below for the one setting each host needs (its **root directory**).
+This is a **monorepo on `main`** — frontend and backend files sit together at the
+repository root:
 
 ```
-invoiceflow/                  # FRONTEND — deploy on Vercel (static + chat function)
-  index.html                  #   the entire app (no build step, no framework)
-  api/chat.py                 #   Gemini chat proxy (Python serverless, stdlib only)
-  vercel.json                 #   function config
-  .gitignore
-
-invoiceflow-backend/          # BACKEND — deploy on a container host
-  app/
-    engine/
-      parse.py                #   namespace-agnostic UBL parser (lxml)
-      rules.py                #   heuristic AE- validator (+ RULE_KB, verdict)
-      scenarios.py            #   scenario catalogue, XML mutation, grading
-      schematron.py           #   optional certified-ruleset validator (Saxon)
-      __init__.py             #   select_validator()
-    api.py                    #   FastAPI app
-    cli.py                    #   command-line runner
-    report.py                 #   JUnit + CSV serialisers
-    samples/                  #   good.xml, bad.xml (identical to the frontend)
-  tests/                      #   pytest: engine + API
-  Dockerfile  requirements.txt  run.sh
+api/
+  chat.py                      # FRONTEND — Gemini chat proxy (Python serverless, stdlib only)
+app/
+  engine/
+    parse.py                   # BACKEND — namespace-agnostic UBL parser (lxml)
+    rules.py                   #   heuristic AE- validator (+ RULE_KB, verdict)
+    scenarios.py               #   scenario catalogue, XML mutation, grading
+    schematron.py               #   optional certified-ruleset validator (Saxon)
+    __init__.py                #   select_validator()
+  api.py                       #   FastAPI app
+  cli.py                       #   command-line runner
+  report.py                    #   JUnit + CSV serialisers
+  samples/                     #   good.xml, bad.xml (identical to the frontend's)
+tests/                         # BACKEND — pytest: engine + API
+Dockerfile                     # BACKEND
+requirements.txt               # BACKEND
+run.sh                         # BACKEND
+index.html                     # FRONTEND — the entire app (no build step, no framework)
+vercel.json                    # FRONTEND — function config
+README.md
 ```
+
+Frontend and backend deploy to two different hosts from this **same** repo (see the
+two Deploy sections below), so each host is pointed only at the files it needs —
+via `.vercelignore` on the frontend side and `.dockerignore` on the backend side —
+rather than a subfolder split. If the mix of Python backend files sitting next to
+the static frontend ever gets confusing, the alternative is to split into
+`invoiceflow/` and `invoiceflow-backend/` subfolders and point each host's **root
+directory** setting at its own subfolder instead; either layout works, this is
+just the one currently in the repo.
 
 ---
 
@@ -114,6 +121,12 @@ The UI is organised like a CAD workbench: a top **ribbon** of three sections, ea
 opening a **toolbar row** of sub-tools beneath it. Each section remembers the last
 tool you used. Invoices are managed in the left rail (drop / browse / samples), the
 open invoice fills the canvas, and the grounded **Assistant** sits on the right.
+
+**Appearance.** A sun/moon toggle in the top bar switches between **dark mode**
+(the default — dark chrome with a light document canvas) and **light mode** (the
+chrome relightens to match the canvas, for a fully bright look). The choice is
+saved in the browser and restored on return, applied before first paint so there's
+no flash of the wrong theme.
 
 **1 · Invoice** — get an invoice in and read it.
 
@@ -156,13 +169,21 @@ reaches the browser.
 
 ### Deploy (Vercel)
 
-1. Import this repo in Vercel.
-2. **Settings → General → Root Directory** → set to `invoiceflow` (this is the
-   step that matters in a monorepo — it tells Vercel to treat `invoiceflow/` as
-   the project root, so it finds `index.html`, `api/chat.py`, and `vercel.json`).
-   No build command needed — it's a static site + a Python function.
+1. Import this repo in Vercel — root directory stays the default (`/`), since
+   `index.html`, `api/chat.py`, and `vercel.json` are already at repo root.
+2. Add a **`.vercelignore`** at repo root listing the backend-only paths, so Vercel's
+   zero-config detection doesn't get confused by a top-level `requirements.txt` /
+   `Dockerfile` sitting next to the frontend, and doesn't upload files it doesn't need:
+   ```
+   app/
+   tests/
+   Dockerfile
+   requirements.txt
+   run.sh
+   ```
+   No build command needed either way — it's a static site + a Python function.
 3. **Settings → Environment Variables** → add `GEMINI_API_KEY` (from Google AI Studio / Google Cloud).
-4. **Redeploy** (env vars, and root-directory changes, only apply to a fresh deploy).
+4. **Redeploy** (env vars only apply to a fresh deploy).
 5. Test with a real chat message. Visiting `/api/chat` should return
    `{"status":"InvoiceFlow chat endpoint. Use POST."}`.
 
@@ -220,7 +241,6 @@ python -m app.cli test app/samples/good.xml --junit results.xml --csv results.cs
 ### Run locally
 
 ```bash
-cd invoiceflow-backend
 pip install -r requirements.txt
 uvicorn app.api:app --reload --port 8000     # or ./run.sh
 pytest -q                                     # 11 tests; engine proves 23/23
@@ -232,13 +252,20 @@ Needs a normal Python runtime (it uses `lxml`, and Saxon for the real ruleset), 
 it goes on a container host — **Render, Railway, Fly.io, or Cloud Run** — not
 Vercel's Python serverless.
 
-In a monorepo, point the host's **root directory** (Render/Railway call it "Root
-Directory"; Cloud Run's `gcloud run deploy --source` takes the subfolder path) at
-`invoiceflow-backend`, so the Dockerfile's own relative paths (`COPY app ./app`,
-etc.) resolve correctly:
+With the flat layout, the repo root **is** the Dockerfile's build context already
+— `requirements.txt` and `app/` sit exactly where `COPY requirements.txt .` and
+`COPY app ./app` expect them, so no root-directory override is needed on the host
+side. The build context does end up including the frontend files too (`index.html`,
+`api/`, `vercel.json`); they're harmless since the Dockerfile only ever copies
+`requirements.txt` and `app/`, but excluding them keeps the context smaller and
+the build a little faster — add these lines to the existing **`.dockerignore`**:
+```
+index.html
+api/
+vercel.json
+```
 
 ```bash
-# from invoiceflow-backend/, or with that folder set as the build context/root:
 docker build -t invoiceflow-backend .
 docker run -p 8000:8000 invoiceflow-backend
 ```
