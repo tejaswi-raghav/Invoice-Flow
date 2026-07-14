@@ -396,6 +396,46 @@
   .sec-sub{font-size:12px;color:var(--muted)}
   .tools-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;margin-bottom:14px;box-shadow:var(--sh)}
   .sec-note{font-size:12.5px;color:var(--muted);margin:2px 0 14px;line-height:1.55}
+  /* ---- traceability / confusion matrix / run history ---- */
+  .cov{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .btn.sm{padding:4px 10px;font-size:11.5px;margin-left:auto}
+  .btn.sm svg{width:13px;height:13px}
+  .btn.sm.active{background:var(--ai-soft);color:var(--ai);border-color:var(--ai)}
+  .trace{margin:12px 0 4px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .trace-table{width:100%;border-collapse:collapse;font-size:12px}
+  .trace-table th{text-align:left;padding:8px 10px;background:var(--chip);color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+  .trace-table td{padding:7px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  .trace-table tr:last-child td{border-bottom:none}
+  .trace-table tr.gap{background:color-mix(in srgb, var(--warn) 7%, transparent)}
+  .trace-table .tc svg{width:14px;height:14px}
+  .trace-table tr:not(.gap) .tc svg{color:var(--pass)}
+  .trace-table tr.gap .tc svg{color:var(--warn)}
+  .sev{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:9px}
+  .sev.fatal{background:#fee2e2;color:#b91c1c}
+  .sev.warning{background:#fef3c7;color:#b45309}
+  .trace-note{padding:10px 12px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);line-height:1.5}
+  .confusion{margin:16px 0;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--panel)}
+  .cf-title{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+  .cf-title svg{width:14px;height:14px;color:var(--ai)}
+  .cf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .cf-cell{border-radius:8px;padding:10px 8px;text-align:center;background:var(--chip)}
+  .cf-cell.tp{background:color-mix(in srgb, var(--pass) 14%, transparent)}
+  .cf-cell.fn{background:color-mix(in srgb, var(--fail) 12%, transparent)}
+  .cf-cell.tn{background:color-mix(in srgb, var(--pass) 8%, transparent)}
+  .cf-cell.fp{background:color-mix(in srgb, var(--fail) 16%, transparent)}
+  .cf-n{font-size:20px;font-weight:800;font-family:var(--mono)}
+  .cf-l{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.3}
+  .cf-l span{opacity:.85}
+  .cf-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+  .cf-stats i{color:var(--muted);font-style:normal;font-size:11px}
+  .cf-note{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.5}
+  .hist-empty{font-size:12.5px;color:var(--muted);padding:8px 0}
+  .hist-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  .hist-table th{text-align:left;padding:6px 8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+  .hist-table td{padding:6px 8px;border-bottom:1px solid var(--line-soft)}
+  .hist-bar{display:inline-block;width:60px;height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden;vertical-align:middle;margin-right:6px}
+  .hist-bar span{display:block;height:100%}
+  .hist-actions{display:flex;gap:8px;margin-top:10px}
 </style>
 </head>
 <body>
@@ -508,7 +548,7 @@ const RULE_KB={
   "AE-EXEMPT-01":"Exempt (E) lines require an exemption reason code (e.g. DL8.46.x)."
 };
 
-const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,sectionLeaf:{invoice:"view",inspect:"validation",tools:"convert"},backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})()};
+const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null,sectionLeaf:{invoice:"view",inspect:"validation",tools:"convert"},backendUrl:(function(){try{return localStorage.getItem("invoiceflow.backend")||"";}catch(e){return "";}})(),runLedger:(function(){try{return JSON.parse(localStorage.getItem("invoiceflow.runledger")||"[]");}catch(e){return [];}})()};
 let idSeq=1;
 
 /* ---- XML helpers ---- */
@@ -788,12 +828,61 @@ function renderValidation(a,findings){
   return toolbar+hero+items+`<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
 }
 
+function traceabilityRows(src){
+  const scByRule={};(src.scenarios||[]).forEach(sc=>{if(sc.kind==="negative")scByRule[sc.rule]=sc;});
+  return Object.keys(RULE_KB).map(id=>{const sc=scByRule[id];
+    return {id,desc:RULE_KB[id],category:sc?sc.category:null,severity:sc?sc.severity:null,scenario:sc?sc.title:null,covered:!!sc};});
+}
+function renderTraceability(src){
+  const rows=traceabilityRows(src);
+  const tr=rows.map(r=>`<tr class="${r.covered?"":"gap"}"><td class="mono">${esc(r.id)}</td><td>${esc(r.desc)}</td><td>${esc(r.category||"—")}</td><td>${r.severity?`<span class="sev ${r.severity}">${esc(r.severity)}</span>`:"—"}</td><td>${esc(r.scenario||"Not yet covered")}</td><td class="tc">${r.covered?ic("check"):ic("x")}</td></tr>`).join("");
+  return `<div class="trace" id="traceMatrix" style="display:none"><table class="trace-table"><thead><tr><th>Rule</th><th>What it checks</th><th>Category</th><th>Severity</th><th>Proven by scenario</th><th></th></tr></thead><tbody>${tr}</tbody></table><div class="trace-note">Every built-in rule the validator can raise, cross-referenced with the scenario that proves it fires. A rule with no scenario is a rule nobody has verified yet — this view exists to make that gap visible instead of folding it into a single coverage percentage.</div></div>`;
+}
+function confusionStats(rows){
+  let tp=0,fn=0,tn=0,fp=0;
+  rows.forEach(r=>{if(r.kind==="negative"){if(r.ok)tp++;else fn++;}else{if(r.ok)tn++;else fp++;}});
+  const precision=(tp+fp)?tp/(tp+fp):null,recall=(tp+fn)?tp/(tp+fn):null,accuracy=rows.length?(tp+tn)/rows.length:null;
+  return {tp,fn,tn,fp,precision,recall,accuracy,nPos:tp+fn,nCtrl:tn+fp};
+}
+function pct(x){return x==null?"—":(x*100).toFixed(0)+"%";}
+function renderConfusion(stats){
+  return `<div class="confusion"><div class="cf-title">${ic("info")} Reliability, not just a pass count</div><div class="cf-grid">
+    <div class="cf-cell tp"><div class="cf-n">${stats.tp}</div><div class="cf-l">True positives<br><span>fault correctly caught</span></div></div>
+    <div class="cf-cell fn"><div class="cf-n">${stats.fn}</div><div class="cf-l">False negatives<br><span>fault missed</span></div></div>
+    <div class="cf-cell tn"><div class="cf-n">${stats.tn}</div><div class="cf-l">True negatives<br><span>clean invoice passed</span></div></div>
+    <div class="cf-cell fp"><div class="cf-n">${stats.fp}</div><div class="cf-l">False positives<br><span>clean invoice wrongly flagged</span></div></div>
+    </div><div class="cf-stats"><span><b>${pct(stats.recall)}</b> recall <i>faults caught</i></span><span><b>${pct(stats.precision)}</b> precision <i>flags that were real</i></span><span><b>${pct(stats.accuracy)}</b> accuracy <i>overall</i></span></div>
+    <div class="cf-note">Computed over this run (n=${stats.nPos} fault scenarios, n=${stats.nCtrl} clean-baseline checks) — not over a broad sample of real invoices. Run “Run all invoices” across more of your own invoices to widen the clean-baseline sample and get a more meaningful false-positive read.</div></div>`;
+}
+function loadRunLedger(){try{return JSON.parse(localStorage.getItem("invoiceflow.runledger")||"[]");}catch(e){return [];}}
+function saveRunLedger(){try{localStorage.setItem("invoiceflow.runledger",JSON.stringify((state.runLedger||[]).slice(0,30)));}catch(e){}}
+function logRun(rows,pass,total){
+  const invoices=[...new Set(rows.map(r=>r.invoice))];const stats=confusionStats(rows);
+  const entry={ts:Date.now(),invoiceCount:invoices.length,invoiceLabel:invoices.length===1?invoices[0]:null,pass,total,tp:stats.tp,fn:stats.fn,tn:stats.tn,fp:stats.fp};
+  state.runLedger=state.runLedger||[];state.runLedger.unshift(entry);state.runLedger=state.runLedger.slice(0,30);saveRunLedger();
+  return stats;
+}
+function renderHistoryHTML(){
+  const log=state.runLedger||[];
+  if(!log.length)return `<div class="hist-empty">No runs recorded yet in this browser — run the checks above to start building a history.</div>`;
+  const rows=log.slice(0,10).map(e=>{const when=new Date(e.ts).toLocaleString();const rate=e.total?Math.round(e.pass/e.total*100):0;
+    const label=e.invoiceCount>1?`Batch · ${e.invoiceCount} invoices`:esc(e.invoiceLabel||"invoice");
+    const col=rate===100?"var(--pass)":rate>=80?"var(--warn)":"var(--fail)";
+    return `<tr><td>${esc(when)}</td><td>${label}</td><td>${e.pass}/${e.total}</td><td><span class="hist-bar"><span style="width:${rate}%;background:${col}"></span></span> ${rate}%</td></tr>`;}).join("");
+  return `<table class="hist-table"><thead><tr><th>When</th><th>Run</th><th>Pass</th><th>Rate</th></tr></thead><tbody>${rows}</tbody></table><div class="hist-actions"><button class="btn" id="histExport">${ic("download")} Export history JSON</button><button class="btn" id="histClear">Clear history</button></div>`;
+}
+function refreshHistoryPanel(){const hh=$("runHistory");if(!hh)return;hh.innerHTML=renderHistoryHTML();
+  const ex=$("histExport");if(ex)ex.onclick=()=>dl(JSON.stringify(state.runLedger||[],null,2),"invoiceflow-run-history.json","application/json");
+  const cl=$("histClear");if(cl)cl.onclick=()=>{state.runLedger=[];saveRunLedger();refreshHistoryPanel();};}
 function renderLab(src){
   const s=src.scenarios||[];const cats=[...new Set(s.map(x=>x.category))];const neg=s.filter(x=>x.kind==="negative").length;
   const cov=coverage(src);const multi=state.sources.filter(x=>x.analysis.ok).length>1;
   let html=`<div class="lab-head"><div class="li">Each scenario takes <b>${esc(src.name)}</b> and injects one fault, then checks that the validator catches it. Run one, run them all, or download the broken XML.</div><div class="tb-actions"><button class="btn ai" id="runAllBtn">${ic("play")} Run all checks</button>${multi?`<button class="btn" id="runBatchBtn">${ic("diff")} Run all invoices</button>`:""}</div></div>`;
   html+=`<div class="lab-summary" id="labSum">${donut(0,s.length)}<div><div class="lt">${s.length} scenarios ready</div><div class="ls">${neg} fault injections across ${cats.length} categories, plus 1 baseline control. Press “Run all checks” to grade them — each should fire its expected rule.</div></div></div>`;
-  html+=`<div class="cov"><span class="covt">Rule coverage</span><div class="covbar"><span style="width:${(cov.covered/cov.total*100).toFixed(0)}%"></span></div><span class="covn">${cov.covered}/${cov.total} built-in rules${cov.missing.length?" · gaps: "+cov.missing.join(", "):" · complete"}</span></div>`;
+  html+=`<div class="cov"><span class="covt">Rule coverage</span><div class="covbar"><span style="width:${(cov.covered/cov.total*100).toFixed(0)}%"></span></div><span class="covn">${cov.covered}/${cov.total} built-in rules${cov.missing.length?" · gaps: "+cov.missing.join(", "):" · complete"}</span><button class="btn sm" id="covToggle">${ic("info")} Traceability matrix</button></div>`;
+  html+=renderTraceability(src);
+  html+=`<div id="labConfusion"></div>`;
+  html+=`<div class="cat-h" style="margin-top:22px"><span class="ci">${ic("dot")}</span>Run history <span style="font-weight:400;color:var(--muted);font-size:12px;margin-left:4px">saved in this browser</span></div><div id="runHistory"></div>`;
   cats.forEach(cat=>{html+=`<div class="cat-h"><span class="ci">${ic(cat)}</span>${esc(cat)}</div>`;
     s.forEach((sc,i)=>{if(sc.category!==cat)return;
       const flowMut=sc.kind==="positive"
@@ -844,6 +933,8 @@ function runScenario(sc){
   return{ok:false,text:`Rule <b>${esc(sc.rule)}</b> did not fire. Fired: ${fnd.filter(f=>f.sev!=="info").map(f=>f.id).join(", ")||"none"}.`};
 }
 function wireLab(src){
+  const ct=$("covToggle");if(ct)ct.onclick=()=>{const m=$("traceMatrix");if(!m)return;const open=m.style.display!=="none";m.style.display=open?"none":"block";ct.classList.toggle("active",!open);};
+  refreshHistoryPanel();
   document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const dpanel=node.querySelector("[data-diff]");
     node.querySelector('[data-act="run"]').onclick=()=>{const r=runScenario(sc);res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);};
     node.querySelector('[data-act="diff"]').onclick=()=>{
@@ -863,7 +954,7 @@ function runAll(src){
   const rows=[];let pass=0;
   document.querySelectorAll(".scn").forEach(node=>{const sc=src.scenarios[+node.dataset.i];const res=node.querySelector("[data-res]");const r=runScenario(sc);if(r.ok)pass++;res.className="runres "+(r.ok?"ok":"miss");res.innerHTML=r.text;setStatus(node,r.ok);rows.push({invoice:src.name,category:sc.category,title:sc.title,rule:sc.rule,kind:sc.kind,ok:r.ok,detail:r.text.replace(/<[^>]+>/g,"")});});
   const total=rows.length;state.lastRun={mode:"single",invoice:src.name,rows};
-  showRunSummary(pass,total,pass===total?"All scenarios behaved as expected":pass+" of "+total+" behaved as expected",pass===total?"Every fault injection fired its expected rule, and the baseline control passed.":"Divergences usually mean the source invoice is already non-compliant — open each card to see what fired.");
+  showRunSummary(pass,total,pass===total?"All scenarios behaved as expected":pass+" of "+total+" behaved as expected",pass===total?"Every fault injection fired its expected rule, and the baseline control passed.":"Divergences usually mean the source invoice is already non-compliant — open each card to see what fired.",rows);
   return{pass,total};
 }
 
@@ -886,9 +977,10 @@ function exportReportHTML(src){
 function xmlDiff(orig,mut){const A=orig.split(/\n/),B=mut.split(/\n/);const sa=new Set(A.map(s=>s.trim())),sb=new Set(B.map(s=>s.trim()));
   const removed=A.filter(l=>l.trim()&&!sb.has(l.trim())).slice(0,8);const added=B.filter(l=>l.trim()&&!sa.has(l.trim())).slice(0,8);return{removed,added};}
 function coverage(src){const keys=Object.keys(RULE_KB);const covered=new Set((src.scenarios||[]).map(s=>s.rule).filter(r=>keys.includes(r)));return{covered:covered.size,total:keys.length,missing:keys.filter(r=>!covered.has(r))};}
-function showRunSummary(pass,total,lead,sub){const sum=$("labSum");if(!sum)return;
+function showRunSummary(pass,total,lead,sub,rows){const sum=$("labSum");if(!sum)return;
   sum.innerHTML=donut(pass,total)+`<div style="flex:1;min-width:0"><div class="lt">${lead}</div><div class="ls">${sub}</div><div class="seg"><span style="color:var(--pass)">${ic("check")} <b>${pass}</b> as expected</span><span style="color:var(--warn)">${ic("alert")} <b>${total-pass}</b> diverged</span><span style="margin-left:auto;display:flex;gap:7px"><button class="btn" id="expRunJson">${ic("download")} JSON</button><button class="btn" id="expRunJunit">${ic("download")} JUnit</button></span></div></div>`;
-  const j=$("expRunJson");if(j)j.onclick=exportRunJSON;const u=$("expRunJunit");if(u)u.onclick=exportRunJunit;}
+  const j=$("expRunJson");if(j)j.onclick=exportRunJSON;const u=$("expRunJunit");if(u)u.onclick=exportRunJunit;
+  if(rows&&rows.length){const stats=logRun(rows,pass,total);const cf=$("labConfusion");if(cf)cf.innerHTML=renderConfusion(stats);refreshHistoryPanel();}}
 function exportRunJSON(){if(state.lastRun)dl(JSON.stringify(state.lastRun,null,2),"invoiceflow-test-results.json","application/json");}
 function exportRunJunit(){if(!state.lastRun)return;const rows=state.lastRun.rows,fails=rows.filter(r=>!r.ok).length;
   let x=`<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="InvoiceFlow PINT-AE" tests="${rows.length}" failures="${fails}">\n`;
@@ -897,7 +989,7 @@ function exportRunJunit(){if(!state.lastRun)return;const rows=state.lastRun.rows
 function runBatch(){const rows=[];state.sources.forEach(src=>{if(!src.analysis.ok)return;(src.scenarios||[]).forEach(sc=>{const r=runScenario(sc);rows.push({invoice:src.name,category:sc.category,title:sc.title,rule:sc.rule,kind:sc.kind,ok:r.ok,detail:r.text.replace(/<[^>]+>/g,"")});});});
   const pass=rows.filter(r=>r.ok).length;state.lastRun={mode:"batch",rows};
   const inv=new Set(rows.map(r=>r.invoice)).size;
-  showRunSummary(pass,rows.length,pass===rows.length?`All ${rows.length} checks passed across ${inv} invoices`:`${pass} of ${rows.length} checks passed across ${inv} invoices`,"Aggregated regression run over every loaded invoice. Export as JSON or JUnit for CI.");}
+  showRunSummary(pass,rows.length,pass===rows.length?`All ${rows.length} checks passed across ${inv} invoices`:`${pass} of ${rows.length} checks passed across ${inv} invoices`,"Aggregated regression run over every loaded invoice. Export as JSON or JUnit for CI.",rows);}
 
 /* ---- source management ---- */
 function addSource(name,raw){const analysis=parsePintAe(raw);const findings=analysis.ok?validate(analysis):[];const scenarios=analysis.ok?generateScenarios(analysis):[];
@@ -1202,14 +1294,14 @@ function printInvoiceXML(xml){const a=parsePintAe(xml);if(a.ok)printOut(printabl
 /* ================= CONVERT TAB ================= */
 function renderConvert(){
   return `<div class="card"><div class="toolbar"><span class="vh">Convert any invoice to PINT-AE XML</span></div>
-    <p style="color:var(--muted);font-size:13px;margin:2px 0 12px">Paste invoice content or choose a file. Structured inputs (existing <b>XML</b>, <b>JSON</b>, <b>CSV</b>) are converted directly in your browser; other formats (pasted text, PDF text) use the AI extractor and must be reviewed.</p>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 12px">Paste invoice content or choose a file — <b>XML, JSON, CSV, Excel (.xlsx/.xls), Word (.docx), PDF,</b> or plain text. Structured formats (XML, JSON, CSV, Excel) are converted directly in your browser; unstructured formats (Word, PDF, pasted text) use the AI extractor and must be reviewed.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <button class="btn" id="cvFile">Choose file (.xml .json .csv .txt .pdf)</button>
+      <button class="btn" id="cvFile">Choose file (any format)</button>
       <select id="cvFmt" style="padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:12.5px">
         <option value="auto">Auto-detect format</option><option value="xml">XML (UBL)</option><option value="json">JSON</option><option value="csv">CSV</option><option value="text">Unstructured text (AI)</option></select>
       <button class="btn" id="cvSampleCsv">Insert CSV example</button>
       <button class="btn" id="cvSampleJson">Insert JSON example</button>
-      <input type="file" id="cvFileInput" accept=".xml,.json,.csv,.txt,.pdf,text/xml,application/xml,application/json,text/csv,text/plain,application/pdf" hidden />
+      <input type="file" id="cvFileInput" accept=".xml,.json,.csv,.txt,.pdf,.xlsx,.xls,.docx,text/xml,application/xml,application/json,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
     </div>
     <textarea id="cvIn" placeholder="Paste invoice XML, JSON, CSV, or plain text here…" style="width:100%;min-height:150px;font-family:var(--mono);font-size:12px;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical"></textarea>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="cvGo" style="background:var(--ai);color:#fff;border-color:var(--ai)">Convert to XML</button><span id="cvMsg" style="font-size:12.5px;color:var(--muted);align-self:center"></span></div>
@@ -1220,6 +1312,8 @@ function wireConvert(){
   $("cvFile").onclick=()=>$("cvFileInput").click();
   $("cvFileInput").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;
     if(/\.pdf$/i.test(file.name)){$("cvMsg").textContent="Reading PDF text…";try{inEl.value=await pdfText(file);$("cvFmt").value="text";$("cvMsg").textContent="PDF text extracted — click Convert (uses AI).";}catch(err){$("cvMsg").textContent="Could not read PDF text: "+err.message;}return;}
+    if(/\.(xlsx|xls)$/i.test(file.name)){$("cvMsg").textContent="Reading spreadsheet…";try{inEl.value=await xlsxToCSV(file);$("cvFmt").value="csv";$("cvMsg").textContent="Spreadsheet read as a table (first sheet) — click Convert.";}catch(err){$("cvMsg").textContent="Could not read spreadsheet: "+err.message;}return;}
+    if(/\.docx$/i.test(file.name)){$("cvMsg").textContent="Reading Word document…";try{inEl.value=await docxToText(file);$("cvFmt").value="text";$("cvMsg").textContent="Document text extracted — click Convert (uses AI).";}catch(err){$("cvMsg").textContent="Could not read .docx: "+err.message;}return;}
     const r=new FileReader();r.onload=()=>{inEl.value=r.result;$("cvMsg").textContent="Loaded "+file.name;};r.readAsText(file);});
   $("cvSampleCsv").onclick=()=>{inEl.value="invoiceNo,issueDate,currency,sellerName,sellerTRN,buyerName,buyerTRN,item,qty,price,vatCat,vatPct\nINV-2026-501,2026-06-20,AED,AlNoor Trading LLC,100123456700003,Gulf Distributors FZE,100987654300003,Steel fittings,10,200,S,5\nINV-2026-501,2026-06-20,AED,AlNoor Trading LLC,100123456700003,Gulf Distributors FZE,100987654300003,Installation,5,200,S,5";$("cvFmt").value="csv";};
   $("cvSampleJson").onclick=()=>{inEl.value=JSON.stringify({id:"INV-2026-777",issueDate:"2026-06-22",currency:"AED",typeCode:"388",seller:{name:"AlNoor Trading LLC",trn:"100123456700003"},buyer:{name:"Gulf Distributors FZE",trn:"100987654300003"},lines:[{name:"Consulting",qty:1,price:5000,vatCat:"S",vatPct:5}]},null,2);$("cvFmt").value="json";};
@@ -1243,6 +1337,26 @@ function wireConvert(){
       $("cvLoad").onclick=()=>addSource(name,xml);
     }catch(err){$("cvMsg").textContent="";$("cvOut").innerHTML=`<div class="finding fatal"><div class="msg">${esc(err.message||"Conversion failed.")}</div><div class="ex">${$("cvFmt").value==="text"||detectFormat(text)==="text"?"Unstructured extraction needs the AI assistant service to be configured and online. You can also paste structured XML, JSON, or CSV, which convert offline.":"Check the input format, or try a different format option."}</div></div>`;}
   };
+}
+async function loadScriptOnce(key,src){
+  if(window[key])return;
+  await new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("could not load required library"));document.head.appendChild(s);});
+}
+async function xlsxToCSV(file){
+  await loadScriptOnce("XLSX","https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+  const buf=await file.arrayBuffer();
+  const wb=window.XLSX.read(buf,{type:"array"});
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  const csv=window.XLSX.utils.sheet_to_csv(sheet);
+  if(!csv.trim())throw new Error("the first sheet appears to be empty");
+  return csv;
+}
+async function docxToText(file){
+  await loadScriptOnce("mammoth","https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+  const buf=await file.arrayBuffer();
+  const res=await window.mammoth.extractRawText({arrayBuffer:buf});
+  if(!res.value||!res.value.trim())throw new Error("no readable text found in the document");
+  return res.value;
 }
 async function pdfText(file){
   if(!window.pdfjsLib){await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=res;s.onerror=()=>rej(new Error("could not load PDF reader"));document.head.appendChild(s);});

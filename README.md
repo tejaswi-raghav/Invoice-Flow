@@ -76,7 +76,10 @@ optional service for automation and certified validation.
 
 ## Repository structure
 
-The two parts can live as one monorepo or two repos.
+This is a **monorepo** — both parts live in this one repository, on `main`. Each
+half deploys independently (different hosts, different lifecycles), so each has
+its own deploy config rooted at its own subfolder; see the two Deploy sections
+below for the one setting each host needs (its **root directory**).
 
 ```
 invoiceflow/                  # FRONTEND — deploy on Vercel (static + chat function)
@@ -124,13 +127,13 @@ open invoice fills the canvas, and the grounded **Assistant** sits on the right.
 | Tool | What it does |
 |---|---|
 | **Validation** | Verdict (accepted / warnings / rejected) with a status ring and a pass·warning·fatal meter; each issue shows severity, rule ID, explanation, and fix. Includes **combination/category rules** (e.g. `ibr-122-ae`, `ibr-151-ae`, `ibr-116-ae`, `ibr-103-ae`, `ibr-120/121-ae`) covering document-type × transaction-type × VAT-category constraints. **Auto-fix** applies safe corrections; an **engine toggle** switches between the built-in heuristics and a backend schematron. Download an HTML report or export findings as JSON/CSV. |
-| **Test Scenarios** | ~23 scenarios that each inject one fault, grouped by category (Identity, Temporal, Parties, Tax, Currency, Totals, Structure, **Combinations**, Baseline), with a results donut, a *valid → fault → rule fires* flow, live pass/fail icons, rule coverage, a before→after XML diff, batch runs across all invoices, and JSON / JUnit export. |
+| **Test Scenarios** | ~23 scenarios that each inject one fault, grouped by category (Identity, Temporal, Parties, Tax, Currency, Totals, Structure, **Combinations**, Baseline), with a results donut, a *valid → fault → rule fires* flow, live pass/fail icons, a before→after XML diff, batch runs across all invoices, and JSON / JUnit export. Three transparency layers sit on top of the run itself: a **traceability matrix** (every built-in rule cross-referenced with the scenario that proves it, so an unproven rule is visible instead of hidden inside a coverage percentage); a **confusion-matrix reliability summary** — true/false positive/negative counts with recall, precision, and accuracy, computed per run and explicit about its own sample size; and a **run ledger** (saved in the browser) logging every run's timestamp, invoice(s), and pass rate, exportable as JSON. |
 
 **3 · Tools** — creation, conversion, and multi-invoice work.
 
 | Tool | What it does |
 |---|---|
-| **Convert** | Turns any uploaded invoice into downloadable PINT-AE XML. Existing **XML**, **JSON**, and **CSV** convert deterministically in the browser; pasted text / PDF text is extracted with the AI assistant (flagged for review). Download the XML, print a readable copy, or load it into the workspace. |
+| **Convert** | Turns an uploaded invoice — **any format** — into downloadable PINT-AE XML. **XML**, **JSON**, **CSV**, and **Excel (.xlsx/.xls)** convert deterministically in the browser (Excel is read via SheetJS and mapped like a CSV table); **Word (.docx)**, PDF text, and pasted plain text are extracted (via mammoth.js / pdf.js) and then structured with the AI assistant, flagged for review. Download the XML, print a readable copy, or load it into the workspace. Scanned/image PDFs aren't supported — that needs OCR. |
 | **Build** | Author a compliant invoice from a form: pick document type, transaction type, and VAT category, see the required/conditional fields with their BT codes and the applicable combination rules, then generate valid UBL to download, print, or load in. |
 | **Compare** | Two invoices side by side — parties, totals (with deltas), tax categories, and which validation issues each raises. |
 | **Batch** | Every loaded invoice in one pass/fail table with fatal/warning counts, combined JSON/CSV export, and a run-all-scenarios sweep. |
@@ -153,10 +156,13 @@ reaches the browser.
 
 ### Deploy (Vercel)
 
-1. Push the `invoiceflow/` folder to a GitHub repo.
-2. Import the repo in Vercel (no build command — it's a static site + Python function).
+1. Import this repo in Vercel.
+2. **Settings → General → Root Directory** → set to `invoiceflow` (this is the
+   step that matters in a monorepo — it tells Vercel to treat `invoiceflow/` as
+   the project root, so it finds `index.html`, `api/chat.py`, and `vercel.json`).
+   No build command needed — it's a static site + a Python function.
 3. **Settings → Environment Variables** → add `GEMINI_API_KEY` (from Google AI Studio / Google Cloud).
-4. **Redeploy** (env vars only apply to a fresh deploy).
+4. **Redeploy** (env vars, and root-directory changes, only apply to a fresh deploy).
 5. Test with a real chat message. Visiting `/api/chat` should return
    `{"status":"InvoiceFlow chat endpoint. Use POST."}`.
 
@@ -226,7 +232,13 @@ Needs a normal Python runtime (it uses `lxml`, and Saxon for the real ruleset), 
 it goes on a container host — **Render, Railway, Fly.io, or Cloud Run** — not
 Vercel's Python serverless.
 
+In a monorepo, point the host's **root directory** (Render/Railway call it "Root
+Directory"; Cloud Run's `gcloud run deploy --source` takes the subfolder path) at
+`invoiceflow-backend`, so the Dockerfile's own relative paths (`COPY app ./app`,
+etc.) resolve correctly:
+
 ```bash
+# from invoiceflow-backend/, or with that folder set as the build context/root:
 docker build -t invoiceflow-backend .
 docker run -p 8000:8000 invoiceflow-backend
 ```
@@ -299,6 +311,10 @@ the backend can flip to the certified validator.
 - Wire the frontend Validation / Test Scenarios tools to optionally run on the backend.
 - Ship and document the certified PINT-AE schematron ruleset for the backend's
   Saxon path.
+- Once that's connected, surface **engine disagreement** as its own finding type —
+  where the built-in heuristics and the certified schematron reach different
+  verdicts on the same invoice — rather than only trusting whichever one is
+  currently selected.
 - Custom-scenario builder (pick a field, choose an operation, declare the rule).
 - Arabic / RTL support; inline tooltips defining each BT code.
 
