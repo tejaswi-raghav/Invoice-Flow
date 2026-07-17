@@ -451,6 +451,13 @@
   .hist-bar{display:inline-block;width:60px;height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden;vertical-align:middle;margin-right:6px}
   .hist-bar span{display:block;height:100%}
   .hist-actions{display:flex;gap:8px;margin-top:10px}
+  .prov{font-size:10px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:9px;white-space:nowrap;border:1px solid transparent}
+  .prov.heur{background:color-mix(in srgb, var(--warn) 15%, transparent);color:var(--warn-d);border-color:color-mix(in srgb, var(--warn) 35%, transparent)}
+  .prov.ref{background:color-mix(in srgb, var(--ai) 15%, transparent);color:var(--ai-2);border-color:color-mix(in srgb, var(--ai) 35%, transparent)}
+  .prov.cert{background:color-mix(in srgb, var(--pass) 14%, transparent);color:var(--pass-d);border-color:color-mix(in srgb, var(--pass) 35%, transparent)}
+  .prov-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--chip)}
+  .prov-t{font-size:11.5px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.04em}
+  .prov-k{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -846,15 +853,31 @@ function renderValidation(a,findings){
   return toolbar+hero+items+`<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (prefixed <span class="mono">AE-</span>) but are not the certified validator. Confirm against the accredited schematron before go-live.</div>`;
 }
 
+function ruleProvenance(id){
+  // AE-*  : my own heuristic stand-in, no published identifier
+  // ibr-* : mirrors a business-rule identifier published in the PINT-AE reference
+  // Neither is the certified schematron. That remains the authority.
+  if(/^ibr-/i.test(id))return {tier:"ref",label:"PINT-AE ref",title:"Mirrors a business-rule identifier published in the PINT-AE reference. Still not the certified schematron."};
+  return {tier:"heur",label:"Heuristic",title:"My own stand-in rule. No published identifier. Approximates intent only \u2014 must be reconciled against the certified schematron."};
+}
+function provenanceTally(){
+  const ids=Object.keys(RULE_KB);let ref=0,heur=0;
+  ids.forEach(id=>{if(ruleProvenance(id).tier==="ref")ref++;else heur++;});
+  return {total:ids.length,ref,heur,certified:0};
+}
 function traceabilityRows(src){
   const scByRule={};(src.scenarios||[]).forEach(sc=>{if(sc.kind==="negative")scByRule[sc.rule]=sc;});
   return Object.keys(RULE_KB).map(id=>{const sc=scByRule[id];
-    return {id,desc:RULE_KB[id],category:sc?sc.category:null,severity:sc?sc.severity:null,scenario:sc?sc.title:null,covered:!!sc};});
+    return {id,desc:RULE_KB[id],category:sc?sc.category:null,severity:sc?sc.severity:null,scenario:sc?sc.title:null,covered:!!sc,prov:ruleProvenance(id)};});
 }
 function renderTraceability(src){
   const rows=traceabilityRows(src);
-  const tr=rows.map(r=>`<tr class="${r.covered?"":"gap"}"><td class="mono">${esc(r.id)}</td><td>${esc(r.desc)}</td><td>${esc(r.category||"—")}</td><td>${r.severity?`<span class="sev ${r.severity}">${esc(r.severity)}</span>`:"—"}</td><td>${esc(r.scenario||"Not yet covered")}</td><td class="tc">${r.covered?ic("check"):ic("x")}</td></tr>`).join("");
-  return `<div class="trace" id="traceMatrix" style="display:none"><table class="trace-table"><thead><tr><th>Rule</th><th>What it checks</th><th>Category</th><th>Severity</th><th>Proven by scenario</th><th></th></tr></thead><tbody>${tr}</tbody></table><div class="trace-note">Every built-in rule the validator can raise, cross-referenced with the scenario that proves it fires. A rule with no scenario is a rule nobody has verified yet — this view exists to make that gap visible instead of folding it into a single coverage percentage.</div></div>`;
+  const t=provenanceTally();
+  const tr=rows.map(r=>`<tr class="${r.covered?"":"gap"}"><td class="mono">${esc(r.id)}</td><td>${esc(r.desc)}</td><td><span class="prov ${r.prov.tier}" title="${esc(r.prov.title)}">${esc(r.prov.label)}</span></td><td>${esc(r.category||"—")}</td><td>${r.severity?`<span class="sev ${r.severity}">${esc(r.severity)}</span>`:"—"}</td><td>${esc(r.scenario||"Not yet covered")}</td><td class="tc">${r.covered?ic("check"):ic("x")}</td></tr>`).join("");
+  return `<div class="trace" id="traceMatrix" style="display:none">
+    <div class="prov-bar"><span class="prov-t">Where these rules come from</span><span class="prov-k"><span class="prov ref">PINT-AE ref</span> ${t.ref} — mirror published business-rule identifiers</span><span class="prov-k"><span class="prov heur">Heuristic</span> ${t.heur} — my own stand-ins</span><span class="prov-k"><span class="prov cert">Certified</span> ${t.certified} — none yet</span></div>
+    <table class="trace-table"><thead><tr><th>Rule</th><th>What it checks</th><th>Source</th><th>Category</th><th>Severity</th><th>Proven by scenario</th><th></th></tr></thead><tbody>${tr}</tbody></table>
+    <div class="trace-note">Every built-in rule the validator can raise, cross-referenced with the scenario that proves it fires. A rule with no scenario is a rule nobody has verified yet — this view exists to make that gap visible instead of folding it into a single coverage percentage. <b>The Source column is the important one:</b> none of these ${t.total} rules is the certified PINT-AE schematron. ${t.ref} mirror identifiers published in the PINT-AE reference; ${t.heur} are stand-ins written to approximate intent. Point the engine toggle at a certified ruleset and the same ${rows.filter(r=>r.covered).length} scenarios grade against the real rules instead.</div></div>`;
 }
 function confusionStats(rows){
   let tp=0,fn=0,tn=0,fp=0;
@@ -1473,23 +1496,54 @@ function wireBuild(){
 }
 
 /* ================= BATCH TAB ================= */
+function renderBatchRunResults(rows){
+  const pass=rows.filter(r=>r.ok).length,total=rows.length;
+  const byInvoice={};rows.forEach(r=>{(byInvoice[r.invoice]=byInvoice[r.invoice]||[]).push(r);});
+  const invNames=Object.keys(byInvoice);
+  const invRows=invNames.map(name=>{const rs=byInvoice[name];const p=rs.filter(r=>r.ok).length,t=rs.length;const pct=t?Math.round(p/t*100):0;
+    const col=p===t?"var(--pass)":p===0?"var(--fail)":"var(--warn)";
+    return `<tr><td>${esc(name)}</td><td style="color:${col};font-weight:600">${p}/${t}</td><td><span class="hist-bar"><span style="width:${pct}%;background:${col}"></span></span> ${pct}%</td></tr>`;}).join("");
+  const stats=logRun(rows,pass,total);
+  const html=`<div class="lab-summary">${donut(pass,total)}<div style="flex:1;min-width:0"><div class="lt">${pass===total?`All ${total} checks passed across ${invNames.length} invoices`:`${pass} of ${total} checks passed across ${invNames.length} invoices`}</div><div class="ls">Aggregated regression run over every loaded invoice. Also logged to the run history in Inspect &amp; Test → Test Scenarios.</div><div class="seg"><span style="color:var(--pass)">${ic("check")} <b>${pass}</b> as expected</span><span style="color:var(--warn)">${ic("alert")} <b>${total-pass}</b> diverged</span><span style="margin-left:auto;display:flex;gap:7px"><button class="btn" id="btExpJson">${ic("download")} JSON</button><button class="btn" id="btExpJunit">${ic("download")} JUnit</button></span></div></div></div>
+    <table class="hist-table" style="margin-bottom:16px"><thead><tr><th>Invoice</th><th>Pass</th><th>Rate</th></tr></thead><tbody>${invRows}</tbody></table>
+    ${renderConfusion(stats)}`;
+  return html;
+}
+function batchScenarioTally(){
+  // pulls per-invoice scenario pass/total from the most recent batch run, if any
+  const lr=state.lastRun;if(!lr||lr.mode!=="batch"||!lr.rows)return null;
+  const byInv={};lr.rows.forEach(r=>{const b=(byInv[r.invoice]=byInv[r.invoice]||{p:0,t:0});b.t++;if(r.ok)b.p++;});
+  return byInv;
+}
 function renderBatch(){
   const srcs=state.sources;
   if(!srcs.length)return `<div class="card"><div class="toolbar"><span class="vh">Batch validation</span></div><p style="color:var(--muted);font-size:13px">Load two or more invoices (left panel, or the Convert/Build tabs) to validate them together and export a combined report.</p></div>`;
+  const tally=batchScenarioTally();
   const rows=srcs.map(s=>{const ok=s.analysis.ok;const f=(s.findings||[]);const fatal=f.filter(x=>x.sev==="fatal").length,warn=f.filter(x=>x.sev==="warning").length;
     const verdict=!ok?"Unreadable":fatal?"Would be rejected":warn?"Valid, warnings":"Passes checks";const col=!ok||fatal?"var(--fail)":warn?"var(--warn)":"var(--pass)";
-    return `<tr style="border-bottom:1px solid var(--line)"><td style="padding:7px 6px"><b>${esc(s.name)}</b></td><td style="padding:7px 6px;color:var(--muted)">${ok?esc(s.analysis.typeName):"—"}</td><td style="padding:7px 6px;color:${col};font-weight:600">${verdict}</td><td style="padding:7px 6px;text-align:center">${fatal}</td><td style="padding:7px 6px;text-align:center">${warn}</td></tr>`;}).join("");
+    const sc=tally&&tally[s.name];const scCell=sc?`<span style="color:${sc.p===sc.t?"var(--pass)":"var(--warn)"};font-weight:600">${sc.p}/${sc.t}</span>`:`<span style="color:var(--faint)">not run</span>`;
+    return `<tr class="batch-row" data-id="${s.id}" style="border-bottom:1px solid var(--line);cursor:pointer" title="Open this invoice's Validation view"><td style="padding:7px 6px"><b>${esc(s.name)}</b></td><td style="padding:7px 6px;color:var(--muted)">${ok?esc(s.analysis.typeName):"—"}</td><td style="padding:7px 6px;color:${col};font-weight:600">${verdict}</td><td style="padding:7px 6px;text-align:center">${fatal}</td><td style="padding:7px 6px;text-align:center">${warn}</td><td style="padding:7px 6px;text-align:center">${scCell}</td></tr>`;}).join("");
   const tot=srcs.reduce((o,s)=>{const f=s.findings||[];o.fatal+=f.filter(x=>x.sev==="fatal").length;o.warn+=f.filter(x=>x.sev==="warning").length;o.clean+=(s.analysis.ok&&!f.some(x=>x.sev==="fatal"||x.sev==="warning"))?1:0;return o;},{fatal:0,warn:0,clean:0});
   return `<div class="card"><div class="toolbar"><span class="vh">Batch validation — ${srcs.length} invoice${srcs.length>1?"s":""}</span><div class="tb-actions"><button class="btn" id="btJson">${ic("download")} JSON</button><button class="btn" id="btCsv">${ic("download")} CSV</button><button class="btn" id="btRun">${ic("play")} Run all scenarios</button></div></div>
     <div style="display:flex;gap:16px;margin-bottom:12px;font-size:13px"><span style="color:var(--pass)"><b>${tot.clean}</b> clean</span><span style="color:var(--warn)"><b>${tot.warn}</b> warnings</span><span style="color:var(--fail)"><b>${tot.fatal}</b> fatal</span></div>
-    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)"><th style="padding:6px">Invoice</th><th style="padding:6px">Type</th><th style="padding:6px">Verdict</th><th style="padding:6px;text-align:center">Fatal</th><th style="padding:6px;text-align:center">Warn</th></tr></thead><tbody>${rows}</tbody></table>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--line)"><th style="padding:6px">Invoice</th><th style="padding:6px">Type</th><th style="padding:6px">Verdict</th><th style="padding:6px;text-align:center">Fatal</th><th style="padding:6px;text-align:center">Warn</th><th style="padding:6px;text-align:center">Scenarios</th></tr></thead><tbody>${rows}</tbody></table>
     <div id="btRunOut" style="margin-top:14px"></div>
-    <div class="legend" style="margin-top:12px"><b>Heuristic checks.</b> Combined view of every loaded invoice. Use the engine toggle on the Validation tab to grade against a backend schematron instead.</div></div>`;
+    <div class="legend" style="margin-top:12px"><b>Heuristic checks.</b> Combined view of every loaded invoice — click a row to open it in Validation. Use the engine toggle there to grade against a backend schematron instead.</div></div>`;
 }
 function wireBatch(){
   const j=$("btJson");if(j)j.onclick=()=>{const out=state.sources.map(s=>({invoice:s.name,type:s.analysis.ok?s.analysis.typeName:null,readable:s.analysis.ok,findings:(s.findings||[]).map(f=>({rule:f.id,severity:f.sev,term:f.term,message:f.msg}))}));dl(JSON.stringify(out,null,2),"invoiceflow-batch-validation.json","application/json");};
   const c=$("btCsv");if(c)c.onclick=()=>{const rows=[["invoice","type","rule","severity","term","message"]];state.sources.forEach(s=>{(s.findings||[]).forEach(f=>rows.push([s.name,s.analysis.ok?s.analysis.typeName:"",f.id,f.sev,f.term,f.msg]));});dl(toCSV(rows),"invoiceflow-batch-validation.csv","text/csv");};
-  const r=$("btRun");if(r)r.onclick=()=>{runBatch();const s=$("labSum");$("btRunOut").innerHTML=s?s.outerHTML:"";};
+  document.querySelectorAll(".batch-row").forEach(tr=>tr.onclick=()=>{state.activeId=+tr.dataset.id;state.tab="validation";state.sectionLeaf.inspect="validation";render();persist();});
+  const r=$("btRun");if(r)r.onclick=()=>{
+    const rows=[];state.sources.forEach(src=>{if(!src.analysis.ok)return;(src.scenarios||[]).forEach(sc=>{const res=runScenario(sc);rows.push({invoice:src.name,category:sc.category,title:sc.title,rule:sc.rule,kind:sc.kind,ok:res.ok,detail:res.text.replace(/<[^>]+>/g,"")});});});
+    if(!rows.length){$("btRunOut").innerHTML=`<div class="finding warning"><div class="msg">No readable invoices with scenarios to run.</div></div>`;return;}
+    state.lastRun={mode:"batch",rows};
+    persist();
+    render();
+    const out=$("btRunOut");if(out)out.innerHTML=renderBatchRunResults(rows);
+    const j2=$("btExpJson");if(j2)j2.onclick=exportRunJSON;
+    const u=$("btExpJunit");if(u)u.onclick=exportRunJunit;
+  };
 }
 
 /* ================= AUTO-FIX ================= */
