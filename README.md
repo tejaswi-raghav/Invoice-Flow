@@ -50,11 +50,12 @@ flowchart LR
     end
 
     subgraph BE["Backend — container host"]
-      API["FastAPI<br/>/test · /validate · /test/batch"]
+      API["FastAPI<br/>/test · /validate · /test/batch · /runs · /stats"]
       ENG["Engine<br/>parse → mutate → grade"]
       VAL{"Validator<br/>(pluggable)"}
       HEUR["Heuristic AE- rules"]
       SCH["Certified schematron<br/>via Saxon (saxonche)"]
+      HIST[("Run history<br/>SQLite")]
     end
 
     User --> APP
@@ -64,13 +65,16 @@ flowchart LR
     API --> ENG --> VAL
     VAL --> HEUR
     VAL --> SCH
+    ENG -->|persists every run| HIST
+    API -.->|/runs · /runs/{id} · /stats| HIST
 ```
 
 **Design choice — client-heavy.** Parsing, validation, test generation, comparison,
 and exports all run in the browser, so the app keeps working with no server. The
 *only* thing that needs a backend in the frontend deployment is the chat, because
 it must hold an API key secretly. The **test-runner backend** is a separate,
-optional service for automation and certified validation.
+optional service for automation, certified validation, and — now — a persisted,
+queryable record of every run it has ever graded.
 
 ---
 
@@ -89,14 +93,19 @@ app/
     scenarios.py               #   scenario catalogue, XML mutation, grading
     schematron.py               #   optional certified-ruleset validator (Saxon)
     __init__.py                #   select_validator()
-  api.py                       #   FastAPI app
-  cli.py                       #   command-line runner
+  config.py                    #   env-driven settings (DB path, CORS, history limit)
+  db.py                        #   SQLite run-history: record / list / stats / prune
+  models.py                    #   Pydantic request & response schemas
+  api.py                       #   FastAPI app — endpoints + persisted run history
+  cli.py                       #   command-line runner — test / validate / history / stats
   report.py                    #   JUnit + CSV serialisers
   samples/                     #   good.xml, bad.xml (identical to the frontend's)
-tests/                         # BACKEND — pytest: engine + API
+tests/                         # BACKEND — pytest: engine, API, db, CLI
+data/                          # BACKEND — run-history SQLite file (git-ignored, created on first run)
 Dockerfile                     # BACKEND
 requirements.txt               # BACKEND
 run.sh                         # BACKEND
+.gitignore                     # data/, *.db, __pycache__/, etc.
 index.html                     # FRONTEND — the entire app (no build step, no framework)
 vercel.json                    # FRONTEND — function config
 README.md
@@ -203,7 +212,10 @@ For each invoice: parse the UBL XML → generate the scenarios → each `mutate(
 re-parses a *fresh* copy and injects one fault (delete the ID, blank a VAT rate,
 duplicate an allowance reason, corrupt a total…) → validate the mutant → grade
 (the expected rule must fire; the positive "control" must pass). Because every
-mutation starts from a clean copy, scenarios never contaminate each other.
+mutation starts from a clean copy, scenarios never contaminate each other. Every
+graded run — its validator, per-scenario outcomes, and which invoices were
+involved — is then persisted (see **Run history** below) before the response
+is returned.
 
 ### Pluggable validator
 
@@ -220,29 +232,56 @@ mutation starts from a clean copy, scenarios never contaminate each other.
 
 | Method & path | Body | Returns |
 |---|---|---|
-| `GET /health` | — | `{status, validator}` |
+| `GET /health` | — | `{status, validator, version, history}` |
 | `POST /validate` | `{xml}` | verdict + findings |
 | `POST /scenarios` | `{xml}` | scenario list (metadata) |
-| `POST /test` | `{xml}` | graded report; `?format=junit` for XML |
-| `POST /test/batch` | `{invoices:[{name,xml}]}` | aggregated report; `?format=junit` |
+| `POST /test` | `{xml}` | graded report + `run_id`; `?format=junit` for XML |
+| `POST /test/batch` | `{invoices:[{name,xml}]}` | aggregated report + `run_id`; `?format=junit` |
+| `GET /runs` | — | `?limit=&offset=` — recent run summaries, most recent first |
+| `GET /runs/{id}` | — | one run in full, including every scenario result |
+| `GET /stats` | — | pass rate, runs by validator, most divergent rules |
 
-CORS is open so the browser app can call it. Interactive docs at `/docs`.
+CORS is open by default (`INVOICEFLOW_CORS_ORIGINS` to restrict it). Interactive
+docs at `/docs`.
+
+### Run history — a server-side audit trail
+
+Every `/test` and `/test/batch` call is persisted automatically (SQLite, no
+extra dependency) as it completes — not just returned once and forgotten. This
+is what the interactive app's browser-only run ledger couldn't be: a record
+that outlives a single tab, that any client can query, and that answers "has
+this ever passed?" across every invoice anyone has tested, not just the one
+open right now.
+
+```bash
+curl localhost:8000/runs?limit=5          # recent runs
+curl localhost:8000/runs/17                # one run, every scenario result
+curl localhost:8000/stats                  # pass rate + most divergent rules across all history
+```
+
+The same history is shared with the CLI (below) — both read and write the same
+database, so a run recorded by CI shows up in `history` on a developer's
+machine pointed at the same `INVOICEFLOW_DB`.
 
 ### CLI
 
 ```bash
 python -m app.cli validate app/samples/bad.xml
 python -m app.cli test app/samples/good.xml --junit results.xml --csv results.csv
+python -m app.cli history                      # recent persisted runs
+python -m app.cli stats                         # aggregate history, most divergent rules
+python -m app.cli history --prune               # drop runs beyond INVOICEFLOW_MAX_HISTORY
 ```
 
-`test` exits non-zero if any scenario diverges, so CI fails on a regression.
+`test` exits non-zero if any scenario diverges, so CI fails on a regression. Every
+`test` run is persisted like the API's; pass `--no-record` to opt out.
 
 ### Run locally
 
 ```bash
 pip install -r requirements.txt
 uvicorn app.api:app --reload --port 8000     # or ./run.sh
-pytest -q                                     # 11 tests; engine proves 23/23
+pytest -q                                     # 34 tests; engine proves 23/23
 ```
 
 ### Deploy (container)
@@ -301,14 +340,20 @@ the backend can flip to the certified validator.
 |---|---|---|
 | Frontend (Vercel) | `GEMINI_API_KEY` | Enables the AI chat. Without it, the assistant uses built-in answers. |
 | Backend | `PINT_SCHEMATRON_XSLT` | Path to the compiled certified ruleset. Set it (with `saxonche` installed) to grade against the real schematron instead of the heuristics. |
+| Backend | `INVOICEFLOW_DB` | Path to the run-history SQLite file. Defaults to `./data/invoiceflow.db`; point every process (API, CLI, CI) at the same path to share one history. |
+| Backend | `INVOICEFLOW_CORS_ORIGINS` | Comma-separated allow-list for the API's CORS policy. Defaults to `*`. |
+| Backend | `INVOICEFLOW_MAX_HISTORY` | Run count beyond which `history --prune` / `db.prune()` becomes eligible to delete. Defaults to 2000; nothing is pruned automatically. |
 
 ---
 
 ## Testing & verification
 
-- **Backend:** `pytest` (11 tests) proves the engine fires the right rule for every
-  scenario (23/23), exercises the API endpoints and JUnit output, and checks
-  malformed input. The CLI's exit code makes it CI-ready.
+- **Backend:** `pytest` (34 tests) proves the engine fires the right rule for every
+  scenario (23/23), exercises the API endpoints and JUnit output, checks malformed
+  input, and covers the run-history layer directly (`db.py`: record/list/get/stats/
+  prune/export) and through the CLI's own entrypoint (`test`/`history`/`stats`
+  against a freshly created database — the check that caught the schema-init bug
+  during development). The CLI's exit code makes it CI-ready.
 - **Frontend:** verified headlessly with jsdom — the actual page script is loaded,
   the UI stubbed, and `parse → generate → run` exercised over every scenario to
   confirm 23/23 and that the render functions emit valid markup.
@@ -324,9 +369,12 @@ the backend can flip to the certified validator.
   VAT-category); reconcile them against the certified schematron before go-live, or
   use the backend's schematron mode (or your ASP's validator).
 - **View is a reading aid**, not an official tax document.
-- **Local persistence.** The frontend keeps loaded invoices and chat in the
-  browser's storage so they survive a refresh; nothing is uploaded. Use **Clear
-  workspace**, and avoid loading sensitive invoices on a shared machine.
+- **Frontend persistence is still local.** The browser app keeps loaded invoices
+  and chat in the browser's storage so they survive a refresh; nothing is
+  uploaded. Use **Clear workspace**, and avoid loading sensitive invoices on a
+  shared machine. This is now genuinely a *frontend-only* limitation — the
+  backend's run history (`app/db.py`) is server-side and shared across clients;
+  it just isn't surfaced in the browser UI yet (see Roadmap).
 - **Runtime split.** The frontend (static + a stdlib chat function) fits Vercel; the
   backend (lxml/Saxon) needs a container host.
 
@@ -334,13 +382,21 @@ the backend can flip to the certified validator.
 
 ## Roadmap
 
+- ~~Server-side run history / audit trail~~ — **done**: every `/test` and
+  `/test/batch` call (and every CLI `test`) is persisted to SQLite and
+  queryable via `/runs`, `/runs/{id}`, `/stats`, and `python -m app.cli
+  history` / `stats`.
 - Wire the frontend Validation / Test Scenarios tools to optionally run on the backend.
 - Ship and document the certified PINT-AE schematron ruleset for the backend's
   Saxon path.
 - Once that's connected, surface **engine disagreement** as its own finding type —
   where the built-in heuristics and the certified schematron reach different
   verdicts on the same invoice — rather than only trusting whichever one is
-  currently selected.
+  currently selected. The `runs` table's `validator` column already makes it
+  possible to compare historical heuristic-mode and schematron-mode results
+  for the same invoice once both have been run.
+- Surface `/stats` and `/runs` in the frontend itself (a "History" tool
+  alongside Batch), so the audit trail isn't API-only.
 - Custom-scenario builder (pick a field, choose an operation, declare the rule).
 - Arabic / RTL support; inline tooltips defining each BT code.
 
