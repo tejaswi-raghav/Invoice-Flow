@@ -66,7 +66,7 @@ flowchart LR
     VAL --> HEUR
     VAL --> SCH
     ENG -->|persists every run| HIST
-    API -.->|/runs · /runs/{id} · /stats| HIST
+    API -.->|/runs · /runs/:id · /stats| HIST
 ```
 
 **Design choice — client-heavy.** Parsing, validation, test generation, comparison,
